@@ -1,0 +1,3379 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>МедОриентир — ИИ-платформа профориентации студентов-медиков Астраханского ГМУ</title>
+<meta name="description" content="Цифровая экосистема медицинского вуза: ИИ-профориентация, стажировки, трудоустройство, портфолио и чат с работодателями." />
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Inter font -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        colors: {
+          brand: {
+            50:  '#f0f9ff',
+            100: '#e0f2fe',
+            500: '#0ea5e9',
+            600: '#0284c7',
+            700: '#0369a1',
+          },
+          teal: {
+            500: '#14b8a6',
+            600: '#0d9488',
+          }
+        },
+        boxShadow: {
+          soft: '0 10px 30px -12px rgba(2, 132, 199, 0.25)',
+          card: '0 6px 24px -10px rgba(15, 23, 42, 0.15)',
+        },
+        animation: {
+          'float-slow': 'float 6s ease-in-out infinite',
+          'pulse-soft': 'pulseSoft 2.4s ease-in-out infinite',
+        },
+        keyframes: {
+          float: { '0%,100%':{transform:'translateY(0)'}, '50%':{transform:'translateY(-12px)'} },
+          pulseSoft: { '0%,100%':{opacity:.9}, '50%':{opacity:.5} }
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  :root{
+    --brand:#0284c7;
+    --teal:#14b8a6;
+  }
+  html{ scroll-behavior:smooth; }
+  body{
+    font-family:'Inter', system-ui, sans-serif;
+    background: #f8fafc;
+    color:#0f172a;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* Градиенты */
+  .grad-brand{ background: linear-gradient(135deg,#0284c7 0%,#14b8a6 100%); }
+  .grad-text{ background: linear-gradient(135deg,#0284c7 0%,#14b8a6 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .grad-soft{ background: linear-gradient(180deg,#f0f9ff 0%,#ffffff 100%); }
+
+  /* Анимации появления */
+  .fade-in{ opacity:0; transform: translateY(24px); transition: opacity .8s ease, transform .8s ease; }
+  .fade-in.visible{ opacity:1; transform: translateY(0); }
+  .fade-in.delay-1{ transition-delay:.1s; }
+  .fade-in.delay-2{ transition-delay:.2s; }
+  .fade-in.delay-3{ transition-delay:.3s; }
+  .fade-in.delay-4{ transition-delay:.4s; }
+
+  /* Карточки */
+  .card-hover{ transition: transform .35s ease, box-shadow .35s ease; }
+  .card-hover:hover{ transform: translateY(-6px); box-shadow: 0 20px 40px -20px rgba(2,132,199,.35); }
+
+  /* Кнопки */
+  .btn-primary{
+    background: linear-gradient(135deg,#0284c7 0%,#14b8a6 100%);
+    color:#fff; font-weight:600; padding:.75rem 1.5rem; border-radius:.75rem;
+    transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+    box-shadow: 0 8px 20px -8px rgba(2,132,199,.6);
+  }
+  .btn-primary:hover{ transform: translateY(-2px); filter: brightness(1.05); }
+  .btn-ghost{
+    border:1px solid #e2e8f0; background:#fff; color:#0f172a; font-weight:500;
+    padding:.75rem 1.5rem; border-radius:.75rem; transition: all .2s ease;
+  }
+  .btn-ghost:hover{ border-color:#0284c7; color:#0284c7; }
+
+  /* Hero паттерн */
+  .hero-pattern{
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(20,184,166,.18), transparent 40%),
+      radial-gradient(circle at 85% 30%, rgba(2,132,199,.22), transparent 45%),
+      radial-gradient(circle at 50% 90%, rgba(20,184,166,.12), transparent 50%);
+  }
+
+  /* Модалки */
+  .modal-backdrop{
+    position: fixed; inset:0; background: rgba(15,23,42,.55); backdrop-filter: blur(6px);
+    display:none; align-items:center; justify-content:center; z-index:80; padding:1rem;
+    animation: fadeIn .25s ease;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal-box{
+    background:#fff; border-radius:1.25rem; max-width: 760px; width:100%;
+    max-height: 90vh; overflow-y:auto;
+    box-shadow: 0 30px 80px -20px rgba(2,132,199,.35);
+    animation: popIn .3s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+  @keyframes popIn{ from{opacity:0; transform: scale(.94) translateY(10px)} to{opacity:1; transform: scale(1) translateY(0)} }
+
+  /* Навигация */
+  .nav-link{ position:relative; }
+  .nav-link::after{
+    content:''; position:absolute; left:0; bottom:-4px; height:2px; width:0;
+    background: linear-gradient(90deg,#0284c7,#14b8a6); transition: width .3s ease;
+  }
+  .nav-link:hover::after{ width:100%; }
+
+  /* Мобильное меню */
+  .mobile-menu{ display:none; }
+  .mobile-menu.open{ display:block; }
+
+  /* Скроллбар */
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-track{ background:#f1f5f9; }
+  ::-webkit-scrollbar-thumb{ background: linear-gradient(#0284c7,#14b8a6); border-radius:10px; }
+
+  /* Бейдж */
+  .badge{ display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .7rem; border-radius:999px; font-size:.75rem; font-weight:600; }
+  .badge-brand{ background:#e0f2fe; color:#0369a1; }
+  .badge-teal{ background:#ccfbf1; color:#0f766e; }
+  .badge-amber{ background:#fef3c7; color:#92400e; }
+  .badge-rose{ background:#ffe4e6; color:#9f1239; }
+
+  /* Кружочки шкалы */
+  .scale-btn{
+    width:40px; height:40px; border-radius:999px; border:2px solid #e2e8f0;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-weight:600; color:#475569; background:#fff; cursor:pointer;
+    transition: all .2s ease;
+  }
+  .scale-btn:hover{ border-color:#0284c7; color:#0284c7; }
+  .scale-btn.active{
+    background: linear-gradient(135deg,#0284c7,#14b8a6); color:#fff; border-color:transparent;
+    box-shadow: 0 6px 16px -6px rgba(2,132,199,.6);
+  }
+
+  /* Чек-боксы специальностей */
+  .chip{
+    display:inline-flex; align-items:center; gap:.4rem; padding:.5rem .9rem;
+    border-radius:999px; border:1px solid #e2e8f0; background:#fff;
+    font-size:.875rem; font-weight:500; cursor:pointer; transition: all .2s ease;
+  }
+  .chip:hover{ border-color:#14b8a6; }
+  .chip.active{
+    background: linear-gradient(135deg,#0284c7,#14b8a6); color:#fff; border-color:transparent;
+  }
+
+  /* Ранжирование */
+  .rank-item{
+    display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem;
+    background:#fff; border:1px solid #e2e8f0; border-radius:.75rem;
+    cursor: grab; transition: all .2s ease;
+  }
+  .rank-item:hover{ border-color:#0284c7; }
+  .rank-item.dragging{ opacity:.5; }
+
+  /* Печатные стили для PDF-резюме */
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; left:0; top:0; width:100%; padding:2rem; }
+    .no-print{ display:none !important; }
+  }
+
+  /* Плавающий чат */
+  .chat-fab{
+    position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 70;
+    width: 60px; height: 60px; border-radius: 999px;
+    background: linear-gradient(135deg,#0284c7,#14b8a6); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 12px 30px -8px rgba(2,132,199,.6);
+    cursor:pointer; transition: transform .2s ease;
+  }
+  .chat-fab:hover{ transform: scale(1.08); }
+
+  /* Уведомления */
+  .toast{
+    position: fixed; top: 1.25rem; right: 1.25rem; z-index: 100;
+    background:#fff; border-left:4px solid #14b8a6; padding:1rem 1.25rem;
+    border-radius:.75rem; box-shadow: 0 10px 30px -10px rgba(15,23,42,.25);
+    max-width: 320px; animation: slideIn .3s ease;
+  }
+  @keyframes slideIn{ from{transform: translateX(120%)} to{transform: translateX(0)} }
+
+  /* Звёзды рейтинга */
+  .star{ color:#e2e8f0; cursor:pointer; transition: color .15s ease; }
+  .star.active, .star:hover, .star:hover ~ .star-rev{ color:#f59e0b; }
+  /* Для корректного hover слева-направо используем flex-row-reverse */
+  .stars-row{ display:inline-flex; flex-direction: row-reverse; justify-content: flex-end; }
+  .stars-row .star:hover, .stars-row .star:hover ~ .star{ color:#f59e0b; }
+
+  /* Счётчик уведомлений */
+  .notif-dot{
+    position:absolute; top:-4px; right:-6px; min-width:18px; height:18px;
+    border-radius:999px; background:#ef4444; color:#fff; font-size:.7rem;
+    display:flex; align-items:center; justify-content:center; padding:0 4px;
+    font-weight:700; border:2px solid #fff;
+  }
+
+  /* Табы анкеты */
+  .quiz-step-dot{
+    width:32px; height:32px; border-radius:999px; display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:.85rem; border:2px solid #e2e8f0; color:#94a3b8; background:#fff;
+  }
+  .quiz-step-dot.active{ background: linear-gradient(135deg,#0284c7,#14b8a6); color:#fff; border-color:transparent; }
+  .quiz-step-dot.done{ background:#14b8a6; color:#fff; border-color:transparent; }
+</style>
+</head>
+<body class="antialiased">
+
+<!-- =========================== HEADER =========================== -->
+<header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <!-- Logo -->
+      <a href="#top" class="flex items-center gap-2.5 group">
+        <div class="w-10 h-10 rounded-xl grad-brand flex items-center justify-center shadow-soft group-hover:scale-105 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21s-7-4.35-7-10a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 5.65-7 10-7 10h-4z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v6M9 11h6" />
+          </svg>
+        </div>
+        <div class="leading-tight">
+          <div class="font-extrabold text-lg grad-text">МедОриентир</div>
+          <div class="text-[11px] text-slate-500 -mt-0.5">Астраханский ГМУ · ИИ-профориентация</div>
+        </div>
+      </a>
+
+      <!-- Desktop nav -->
+      <nav class="hidden lg:flex items-center gap-7 text-sm font-medium text-slate-700">
+        <a href="#concept" class="nav-link">О платформе</a>
+        <a href="#journey" class="nav-link">Путь студента</a>
+        <a href="#quiz-detail" class="nav-link">ИИ-анкета</a>
+        <a href="#modules" class="nav-link">Модули</a>
+        <a href="#partners" class="nav-link">Партнёры</a>
+      </nav>
+
+      <!-- Right side -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Уведомления -->
+        <button id="notifBtn" class="relative hidden sm:inline-flex w-10 h-10 rounded-xl border border-slate-200 hover:border-brand-500 hover:text-brand-600 items-center justify-center transition" title="Уведомления">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-5-5.9V5a1 1 0 1 0-2 0v.1A6 6 0 0 0 6 11v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0a3 3 0 1 1-6 0" />
+          </svg>
+          <span id="notifDot" class="notif-dot hidden">0</span>
+        </button>
+
+        <!-- Auth / Profile -->
+        <div id="authArea" class="flex items-center gap-2">
+          <button onclick="openModal('authModal')" class="btn-ghost !py-2 !px-4 text-sm">Войти</button>
+          <button onclick="openModal('authModal','register')" class="btn-primary !py-2 !px-4 text-sm hidden sm:inline-flex">Регистрация</button>
+        </div>
+        <div id="profileArea" class="hidden items-center gap-2">
+          <button id="profileBtn" onclick="openProfileForCurrentUser()" class="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border border-slate-200 hover:border-brand-500 transition">
+            <div id="profileAvatar" class="w-7 h-7 rounded-lg grad-brand text-white text-xs font-bold flex items-center justify-center">У</div>
+            <span id="profileName" class="hidden sm:inline text-sm font-semibold text-slate-800 max-w-[120px] truncate">Имя</span>
+            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <button onclick="logout()" class="w-9 h-9 rounded-xl border border-slate-200 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 flex items-center justify-center transition" title="Выйти">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+
+        <!-- Mobile burger -->
+        <button id="burger" class="lg:hidden w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center" aria-label="Меню">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile menu -->
+    <div id="mobileMenu" class="mobile-menu lg:hidden pb-4">
+      <div class="flex flex-col gap-1 pt-2 border-t border-slate-200">
+        <a href="#concept" class="px-3 py-2 rounded-lg hover:bg-slate-100">О платформе</a>
+        <a href="#journey" class="px-3 py-2 rounded-lg hover:bg-slate-100">Путь студента</a>
+        <a href="#quiz-detail" class="px-3 py-2 rounded-lg hover:bg-slate-100">ИИ-анкета</a>
+        <a href="#modules" class="px-3 py-2 rounded-lg hover:bg-slate-100">Модули</a>
+        <a href="#partners" class="px-3 py-2 rounded-lg hover:bg-slate-100">Партнёры</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- =========================== HERO =========================== -->
+<section class="hero-pattern grad-soft relative overflow-hidden">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
+    <div class="grid lg:grid-cols-2 gap-12 items-center">
+      <!-- Текст -->
+      <div>
+        <div class="fade-in inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-teal-500 animate-pulse-soft"></span>
+          <span class="text-xs font-semibold text-slate-600">Цифровая экосистема Астраханского ГМУ · 2026</span>
+        </div>
+        <h1 class="fade-in delay-1 mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.05]">
+          Твой путь в медицине — <span class="grad-text">с ИИ-навигатором</span>
+        </h1>
+        <p class="fade-in delay-2 mt-5 text-lg text-slate-600 max-w-xl">
+          МедОриентир помогает студентам-медикам выбрать специализацию ординатуры, найти стажировку в ведущих клиниках Астрахани и построить карьеру — на основе данных, портфолио и умных рекомендаций.
+        </p>
+
+        <div class="fade-in delay-3 mt-8 flex flex-wrap gap-3">
+          <button onclick="startQuizOrLogin()" class="btn-primary inline-flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
+            Пройти ИИ-анкету
+          </button>
+          <a href="#modules" class="btn-ghost inline-flex items-center gap-2">
+            Смотреть возможности
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+          </a>
+        </div>
+
+        <!-- Мини-статистика -->
+        <div class="fade-in delay-4 mt-10 grid grid-cols-3 gap-4 max-w-lg">
+          <div>
+            <div class="text-2xl font-extrabold grad-text">6</div>
+            <div class="text-xs text-slate-500 mt-1">специализаций в ИИ-модели</div>
+          </div>
+          <div>
+            <div class="text-2xl font-extrabold grad-text">24/7</div>
+            <div class="text-xs text-slate-500 mt-1">чат с работодателями</div>
+          </div>
+          <div>
+            <div class="text-2xl font-extrabold grad-text">100%</div>
+            <div class="text-xs text-slate-500 mt-1">бесплатно для студентов Астраханского ГМУ</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Визуал -->
+      <div class="fade-in delay-2 relative">
+        <div class="relative aspect-[4/5] max-w-md mx-auto">
+          <!-- Большая карточка -->
+          <div class="absolute inset-0 rounded-3xl grad-brand shadow-soft animate-float-slow"></div>
+          <div class="absolute inset-3 rounded-3xl bg-white p-6 flex flex-col">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-xl bg-sky-100 text-brand-600 flex items-center justify-center">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3v3.75m4.5-3.75v3.75M4.5 9.75h15M5.25 7.5h13.5a1.5 1.5 0 0 1 1.5 1.5v10.5a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5V9a1.5 1.5 0 0 1 1.5-1.5z"/></svg>
+                </div>
+                <div>
+                  <div class="text-xs text-slate-500">ИИ-рекомендация</div>
+                  <div class="text-sm font-bold">Топ-5 специальностей</div>
+                </div>
+              </div>
+              <span class="badge badge-teal">92% совпадение</span>
+            </div>
+
+            <div class="mt-5 space-y-3">
+              <!-- Пункты -->
+              <div class="flex items-center justify-between p-3 rounded-xl bg-sky-50 border border-sky-100">
+                <div class="flex items-center gap-3">
+                  <div class="text-xl">🫀</div>
+                  <div>
+                    <div class="font-semibold text-sm">Кардиология</div>
+                    <div class="text-[11px] text-slate-500">Аналитика + точность</div>
+                  </div>
+                </div>
+                <div class="font-bold text-brand-600">92%</div>
+              </div>
+              <div class="flex items-center justify-between p-3 rounded-xl bg-teal-50 border border-teal-100">
+                <div class="flex items-center gap-3">
+                  <div class="text-xl">🧠</div>
+                  <div>
+                    <div class="font-semibold text-sm">Неврология</div>
+                    <div class="text-[11px] text-slate-500">Логика + диагностика</div>
+                  </div>
+                </div>
+                <div class="font-bold text-teal-600">87%</div>
+              </div>
+              <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div class="flex items-center gap-3">
+                  <div class="text-xl">🩺</div>
+                  <div>
+                    <div class="font-semibold text-sm">Терапия</div>
+                    <div class="text-[11px] text-slate-500">Общение + широкий профиль</div>
+                  </div>
+                </div>
+                <div class="font-bold text-slate-600">78%</div>
+              </div>
+            </div>
+
+            <div class="mt-auto pt-5 flex items-center justify-between">
+              <div class="text-[11px] text-slate-500">Обновлено только что</div>
+              <button class="text-xs font-semibold text-brand-600 hover:underline">Перейти к стажировкам →</button>
+            </div>
+          </div>
+
+          <!-- Плавающие карточки -->
+          <div class="hidden sm:flex absolute -left-6 top-10 bg-white rounded-2xl shadow-card p-3 items-center gap-2 animate-float-slow" style="animation-delay:-2s">
+            <div class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">⭐</div>
+            <div>
+              <div class="text-[11px] text-slate-500">Рейтинг клиники</div>
+              <div class="text-sm font-bold">4.8 / 5 · 124 отзыва</div>
+            </div>
+          </div>
+
+          <div class="hidden sm:flex absolute -right-4 bottom-16 bg-white rounded-2xl shadow-card p-3 items-center gap-2 animate-float-slow" style="animation-delay:-4s">
+            <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">💬</div>
+            <div>
+              <div class="text-[11px] text-slate-500">Новое сообщение</div>
+              <div class="text-sm font-bold">АМОКБ: приглашаем…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== STATS =========================== -->
+<section class="py-14 bg-white border-y border-slate-100">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="fade-in text-center lg:text-left lg:border-r border-slate-100">
+        <div class="text-4xl font-extrabold grad-text" id="statStudents">1 240+</div>
+        <div class="mt-1 text-sm text-slate-600">студентов Астраханского ГМУ в системе</div>
+      </div>
+      <div class="fade-in delay-1 text-center lg:text-left lg:border-r border-slate-100">
+        <div class="text-4xl font-extrabold grad-text">38</div>
+        <div class="mt-1 text-sm text-slate-600">клиник-партнёров в Астрахани</div>
+      </div>
+      <div class="fade-in delay-2 text-center lg:text-left lg:border-r border-slate-100">
+        <div class="text-4xl font-extrabold grad-text">156</div>
+        <div class="mt-1 text-sm text-slate-600">активных стажировок и вакансий</div>
+      </div>
+      <div class="fade-in delay-3 text-center lg:text-left">
+        <div class="text-4xl font-extrabold grad-text">94%</div>
+        <div class="mt-1 text-sm text-slate-600">студентов нашли место за 3 мес.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== CONCEPT =========================== -->
+<section id="concept" class="py-20 bg-slate-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center">
+      <span class="fade-in badge badge-brand">О платформе</span>
+      <h2 class="fade-in delay-1 mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
+        Одна экосистема — <span class="grad-text">три роли</span>, все возможности
+      </h2>
+      <p class="fade-in delay-2 mt-4 text-slate-600 text-lg">
+        МедОриентир объединяет студентов, клиники и университет в единой цифровой среде: от первой анкеты до первого трудового договора.
+      </p>
+    </div>
+
+    <div class="mt-14 grid md:grid-cols-3 gap-6">
+      <!-- Студент -->
+      <div class="fade-in card-hover bg-white rounded-2xl p-7 border border-slate-100 shadow-card">
+        <div class="w-12 h-12 rounded-xl bg-sky-100 text-brand-600 flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 14l9-5-9-5-9 5 9 5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 14l6.16-3.422A12 12 0 0 1 12 20.5a12 12 0 0 1-6.16-9.922L12 14z"/></svg>
+        </div>
+        <h3 class="mt-5 text-xl font-bold">Студент</h3>
+        <p class="mt-2 text-slate-600 text-sm">Проходит ИИ-анкету, получает топ-5 специализаций, ведёт портфолио, откликается на стажировки и пишет в чат клиникам.</p>
+        <ul class="mt-4 space-y-2 text-sm text-slate-700">
+          <li class="flex gap-2"><span class="text-teal-500">✓</span> Умная профориентация</li>
+          <li class="flex gap-2"><span class="text-teal-500">✓</span> PDF-резюме в 1 клик</li>
+          <li class="flex gap-2"><span class="text-teal-500">✓</span> Прямой чат с работодателем</li>
+        </ul>
+      </div>
+
+      <!-- Работодатель -->
+      <div class="fade-in delay-1 card-hover bg-white rounded-2xl p-7 border border-slate-100 shadow-card">
+        <div class="w-12 h-12 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16l7-3 7 3z"/></svg>
+        </div>
+        <h3 class="mt-5 text-xl font-bold">Работодатель</h3>
+        <p class="mt-2 text-slate-600 text-sm">Медицинские организации публикуют стажировки и вакансии, просматривают портфолио студентов, ведут диалоги и получают рейтинг.</p>
+        <ul class="mt-4 space-y-2 text-sm text-slate-700">
+          <li class="flex gap-2"><span class="text-teal-500">✓</span> Управление вакансиями</li>
+          <li class="flex gap-2"><span class="text-teal-500">✓</span> Просмотр портфолио</li>
+          <li class="flex gap-2"><span class="text-teal-500">✓</span> Прозрачный рейтинг</li>
+        </ul>
+      </div>
+
+      <!-- Администратор -->
+      <div class="fade-in delay-2 card-hover bg-white rounded-2xl p-7 border border-slate-100 shadow-card">
+        <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m0 0v3m0-3h3m-3 0H9m12-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+        </div>
+        <h3 class="mt-5 text-xl font-bold">Администратор (Астраханский ГМУ)</h3>
+        <p class="mt-2 text-slate-600 text-sm">Университет видит аналитику: распределение студентов по специальностям, активность, отклики, организует дни карьеры.</p>
+        <ul class="mt-4 space-y-2 text-sm text-slate-700">
+          <li class="flex gap-2"><span class="text-teal-500">✓</span> Дашборд и аналитика</li>
+          <li class="flex gap-2"><span class="text-teal-500">✓</span> Управление пользователями</li>
+          <li class="flex gap-2"><span class="text-teal-500">✓</span> Календарь мероприятий</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== USER JOURNEY =========================== -->
+<section id="journey" class="py-20 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center">
+      <span class="fade-in badge badge-teal">Путь студента</span>
+      <h2 class="fade-in delay-1 mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
+        От <span class="grad-text">первого входа</span> до первого оффера
+      </h2>
+      <p class="fade-in delay-2 mt-4 text-slate-600 text-lg">Четыре простых шага, чтобы понять, кем ты хочешь стать, и найти для этого место.</p>
+    </div>
+
+    <div class="mt-14 relative">
+      <!-- Линия -->
+      <div class="hidden md:block absolute left-0 right-0 top-10 h-0.5 bg-gradient-to-r from-brand-500 via-teal-500 to-brand-500 opacity-30"></div>
+
+      <div class="grid md:grid-cols-4 gap-6">
+        <!-- Шаг 1 -->
+        <div class="fade-in relative">
+          <div class="relative z-10 w-20 h-20 mx-auto rounded-2xl grad-brand text-white flex items-center justify-center text-2xl font-extrabold shadow-soft">01</div>
+          <h3 class="mt-5 text-center font-bold text-lg">Регистрация</h3>
+          <p class="mt-2 text-center text-sm text-slate-600">Укажи факультет и курс — мы подберём релевантные стажировки и рекомендации.</p>
+        </div>
+        <!-- Шаг 2 -->
+        <div class="fade-in delay-1 relative">
+          <div class="relative z-10 w-20 h-20 mx-auto rounded-2xl grad-brand text-white flex items-center justify-center text-2xl font-extrabold shadow-soft">02</div>
+          <h3 class="mt-5 text-center font-bold text-lg">ИИ-анкета</h3>
+          <p class="mt-2 text-center text-sm text-slate-600">5 блоков: профиль, предпочтения, опыт, ценности, условия. Занимает ~6 минут.</p>
+        </div>
+        <!-- Шаг 3 -->
+        <div class="fade-in delay-2 relative">
+          <div class="relative z-10 w-20 h-20 mx-auto rounded-2xl grad-brand text-white flex items-center justify-center text-2xl font-extrabold shadow-soft">03</div>
+          <h3 class="mt-5 text-center font-bold text-lg">Топ-5 специальностей</h3>
+          <p class="mt-2 text-center text-sm text-slate-600">Получи персональный рейтинг направлений с обоснованием и «красными флагами».</p>
+        </div>
+        <!-- Шаг 4 -->
+        <div class="fade-in delay-3 relative">
+          <div class="relative z-10 w-20 h-20 mx-auto rounded-2xl grad-brand text-white flex items-center justify-center text-2xl font-extrabold shadow-soft">04</div>
+          <h3 class="mt-5 text-center font-bold text-lg">Отклики и оффер</h3>
+          <p class="mt-2 text-center text-sm text-slate-600">Откликайся на стажировки на карте, общайся в чате, получай приглашения.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-12 text-center">
+      <button onclick="startQuizOrLogin()" class="btn-primary">Начать путь →</button>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== AI QUESTIONNAIRE DETAIL =========================== -->
+<section id="quiz-detail" class="py-20 bg-slate-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid lg:grid-cols-2 gap-12 items-center">
+      <div>
+        <span class="fade-in badge badge-brand">ИИ-анкета</span>
+        <h2 class="fade-in delay-1 mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
+          5 блоков, которые <span class="grad-text">действительно работают</span>
+        </h2>
+        <p class="fade-in delay-2 mt-4 text-slate-600 text-lg">
+          Мы объединили психологические методики, академические предпочтения и анализ рынка труда. Алгоритм учитывает не только твои ответы, но и опыт похожих студентов, и реальный спрос клиник.
+        </p>
+
+        <div class="mt-8 space-y-3">
+          <div class="fade-in flex items-start gap-4 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+            <div class="w-10 h-10 rounded-lg bg-sky-100 text-brand-600 flex items-center justify-center font-bold">1</div>
+            <div>
+              <div class="font-semibold">Психологический профиль</div>
+              <div class="text-sm text-slate-600">Шкала 1–5 по утверждениям: работа руками, аналитика, общение, стресс.</div>
+            </div>
+          </div>
+          <div class="fade-in delay-1 flex items-start gap-4 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+            <div class="w-10 h-10 rounded-lg bg-teal-100 text-teal-600 flex items-center justify-center font-bold">2</div>
+            <div>
+              <div class="font-semibold">Академические предпочтения</div>
+              <div class="text-sm text-slate-600">Выбор до 3 любимых специальностей и до 2 навыков, которые хочешь развить.</div>
+            </div>
+          </div>
+          <div class="fade-in delay-2 flex items-start gap-4 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+            <div class="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center font-bold">3</div>
+            <div>
+              <div class="font-semibold">Практический опыт</div>
+              <div class="text-sm text-slate-600">СНК, волонтёрство, дежурства — каждый опыт даёт бонус «своим» специальностям.</div>
+            </div>
+          </div>
+          <div class="fade-in delay-3 flex items-start gap-4 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+            <div class="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center font-bold">4</div>
+            <div>
+              <div class="font-semibold">Профессиональные ценности</div>
+              <div class="text-sm text-slate-600">Ранжирование 6 ценностей: доход, баланс, наука, престиж, помощь, динамика.</div>
+            </div>
+          </div>
+          <div class="fade-in delay-4 flex items-start gap-4 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+            <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">5</div>
+            <div>
+              <div class="font-semibold">Условия труда</div>
+              <div class="text-sm text-slate-600">Готовность к переезду, режим, допустимый уровень стресса — фильтруем реалистично.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Визуал анкеты -->
+      <div class="fade-in delay-2 relative">
+        <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-semibold text-slate-500">Шаг 2 из 5</div>
+            <span class="badge badge-teal">Академические предпочтения</span>
+          </div>
+          <h3 class="mt-3 text-xl font-bold">Какие специальности тебе интересны?</h3>
+          <p class="text-sm text-slate-500 mt-1">Можно выбрать до 3 направлений</p>
+
+          <div class="mt-5 flex flex-wrap gap-2">
+            <span class="chip active">🫀 Кардиология</span>
+            <span class="chip active">🧠 Неврология</span>
+            <span class="chip">🔪 Хирургия</span>
+            <span class="chip">🩺 Терапия</span>
+            <span class="chip active">👶 Педиатрия</span>
+            <span class="chip">💤 Анестезиология</span>
+            <span class="chip">🦴 Травматология</span>
+            <span class="chip">👁 Офтальмология</span>
+          </div>
+
+          <div class="mt-6">
+            <div class="text-sm font-semibold text-slate-700">Какие навыки хочешь развить? (до 2)</div>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <span class="chip">УЗИ-диагностика</span>
+              <span class="chip active">ЭКГ-интерпретация</span>
+              <span class="chip">Хирургический шов</span>
+              <span class="chip">Реанимация</span>
+            </div>
+          </div>
+
+          <div class="mt-6 flex items-center justify-between pt-5 border-t border-slate-100">
+            <button class="btn-ghost !py-2 !px-4 text-sm">← Назад</button>
+            <div class="flex gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-slate-200"></span>
+              <span class="w-2 h-2 rounded-full grad-brand"></span>
+              <span class="w-2 h-2 rounded-full bg-slate-200"></span>
+              <span class="w-2 h-2 rounded-full bg-slate-200"></span>
+              <span class="w-2 h-2 rounded-full bg-slate-200"></span>
+            </div>
+            <button class="btn-primary !py-2 !px-4 text-sm">Далее →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== MODULES (placeholder — продолжение в Части 2) =========================== -->
+<section id="modules" class="py-20 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center">
+      <span class="fade-in badge badge-brand">Модули платформы</span>
+      <h2 class="fade-in delay-1 mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
+        Всё, что нужно для <span class="grad-text">карьеры в медицине</span>
+      </h2>
+      <p class="fade-in delay-2 mt-4 text-slate-600 text-lg">12 связанных модулей в одном окне: от ИИ-анкеты до чата с клиникой и PDF-резюме.</p>
+    </div>
+
+    <div class="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Модули будут заполнены в Части 2 -->
+      <div class="fade-in card-hover bg-gradient-to-br from-sky-50 to-white rounded-2xl p-6 border border-slate-100">
+        <div class="text-3xl">🧭</div>
+        <h3 class="mt-3 font-bold text-lg">ИИ-профориентация</h3>
+        <p class="mt-2 text-sm text-slate-600">Топ-5 специальностей с обоснованием и «красными флагами».</p>
+      </div>
+      <div class="fade-in delay-1 card-hover bg-gradient-to-br from-teal-50 to-white rounded-2xl p-6 border border-slate-100">
+        <div class="text-3xl">🗺️</div>
+        <h3 class="mt-3 font-bold text-lg">Карта стажировок</h3>
+        <p class="mt-2 text-sm text-slate-600">Leaflet-карта клиник Астрахани с фильтрами по типу и специальности.</p>
+      </div>
+      <div class="fade-in delay-2 card-hover bg-gradient-to-br from-amber-50 to-white rounded-2xl p-6 border border-slate-100">
+        <div class="text-3xl">💼</div>
+        <h3 class="mt-3 font-bold text-lg">Портфолио и PDF</h3>
+        <p class="mt-2 text-sm text-slate-600">Единое резюме: образование, опыт, наука, навыки — экспорт в PDF.</p>
+      </div>
+      <div class="fade-in card-hover bg-gradient-to-br from-rose-50 to-white rounded-2xl p-6 border border-slate-100">
+        <div class="text-3xl">💬</div>
+        <h3 class="mt-3 font-bold text-lg">Чат с работодателем</h3>
+        <p class="mt-2 text-sm text-slate-600">Прямой диалог из карточки вакансии — без посредников.</p>
+      </div>
+      <div class="fade-in delay-1 card-hover bg-gradient-to-br from-indigo-50 to-white rounded-2xl p-6 border border-slate-100">
+        <div class="text-3xl">⭐</div>
+        <h3 class="mt-3 font-bold text-lg">Рейтинг клиник</h3>
+        <p class="mt-2 text-sm text-slate-600">Честные отзывы студентов, которые реально откликались.</p>
+      </div>
+      <div class="fade-in delay-2 card-hover bg-gradient-to-br from-emerald-50 to-white rounded-2xl p-6 border border-slate-100">
+        <div class="text-3xl">📅</div>
+        <h3 class="mt-3 font-bold text-lg">Календарь мероприятий</h3>
+        <p class="mt-2 text-sm text-slate-600">Дни карьеры, вебинары, мастер-классы — запись в 1 клик.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- =========================== ROADMAP =========================== -->
+<section id="roadmap" class="py-20 bg-slate-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center">
+      <span class="fade-in badge badge-amber">Дорожная карта</span>
+      <h2 class="fade-in delay-1 mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
+        План развития <span class="grad-text">платформы</span>
+      </h2>
+      <p class="fade-in delay-2 mt-4 text-slate-600 text-lg">От MVP до полноценной цифровой экосистемы медицинского вуза.</p>
+    </div>
+
+    <div class="mt-14 grid md:grid-cols-4 gap-5">
+      <div class="fade-in card-hover bg-white rounded-2xl p-6 border border-slate-100 relative">
+        <div class="absolute -top-3 left-6 badge badge-teal">✓ Готово</div>
+        <div class="text-2xl">🎯</div>
+        <div class="mt-3 text-xs font-bold text-slate-500">Q1 2026</div>
+        <h3 class="mt-1 font-bold">MVP</h3>
+        <p class="mt-2 text-sm text-slate-600">ИИ-анкета, каталог стажировок, личный кабинет студента.</p>
+      </div>
+      <div class="fade-in delay-1 card-hover bg-white rounded-2xl p-6 border border-slate-100 relative">
+        <div class="absolute -top-3 left-6 badge badge-brand">В работе</div>
+        <div class="text-2xl">💬</div>
+        <div class="mt-3 text-xs font-bold text-slate-500">Q2 2026</div>
+        <h3 class="mt-1 font-bold">Коммуникации</h3>
+        <p class="mt-2 text-sm text-slate-600">Чат с работодателями, рейтинг клиник, календарь мероприятий.</p>
+      </div>
+      <div class="fade-in delay-2 card-hover bg-white rounded-2xl p-6 border border-slate-100">
+        <div class="text-2xl">🤖</div>
+        <div class="mt-3 text-xs font-bold text-slate-500">Q3 2026</div>
+        <h3 class="mt-1 font-bold">ИИ 2.0</h3>
+        <p class="mt-2 text-sm text-slate-600">Коллаборативная фильтрация, прогноз востребованности специальностей.</p>
+      </div>
+      <div class="fade-in delay-3 card-hover bg-white rounded-2xl p-6 border border-slate-100">
+        <div class="text-2xl">🌍</div>
+        <div class="mt-3 text-xs font-bold text-slate-500">Q4 2026</div>
+        <h3 class="mt-1 font-bold">Масштабирование</h3>
+        <p class="mt-2 text-sm text-slate-600">Подключение других медвузов страны, мобильное приложение.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== VACANCIES CATALOG =========================== -->
+<section id="vacancies" class="py-20 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center">
+      <span class="fade-in badge badge-teal">Каталог возможностей</span>
+      <h2 class="fade-in delay-1 mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
+        Стажировки и <span class="grad-text">вакансии клиник</span>
+      </h2>
+      <p class="fade-in delay-2 mt-4 text-slate-600 text-lg">Фильтруй по типу предложения и специальности. Откликайся в 1 клик.</p>
+    </div>
+
+    <!-- Фильтры -->
+    <div class="fade-in mt-10 flex flex-wrap items-center justify-center gap-2">
+      <button class="vac-filter chip active" data-filter="all">🔍 Все</button>
+      <button class="vac-filter chip" data-filter="internship">🎓 Стажировки</button>
+      <button class="vac-filter chip" data-filter="volunteer">🤝 Волонтёрство</button>
+      <button class="vac-filter chip" data-filter="job">💼 Вакансии</button>
+    </div>
+
+    <!-- Фильтр по специальности -->
+    <div class="fade-in mt-4 flex justify-center">
+      <select id="specFilter" class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium focus:border-brand-500 outline-none">
+        <option value="all">Все специальности</option>
+        <option value="Кардиология">🫀 Кардиология</option>
+        <option value="Хирургия">🔪 Хирургия</option>
+        <option value="Терапия">🩺 Терапия</option>
+        <option value="Неврология">🧠 Неврология</option>
+        <option value="Педиатрия">👶 Педиатрия</option>
+        <option value="Анестезиология">💤 Анестезиология</option>
+      </select>
+    </div>
+
+    <!-- Список -->
+    <div id="vacanciesList" class="mt-10 grid md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+
+    <div id="vacanciesEmpty" class="hidden mt-10 text-center py-12 text-slate-500">
+      <div class="text-5xl mb-3">🔎</div>
+      <div class="font-semibold">Пока нет предложений по этим фильтрам</div>
+      <div class="text-sm mt-1">Попробуй изменить фильтры или зайди позже</div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== MAP =========================== -->
+<section id="mapSection" class="py-20 bg-slate-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center">
+      <span class="fade-in badge badge-brand">Карта клиник</span>
+      <h2 class="fade-in delay-1 mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
+        Клиники Астрахани <span class="grad-text">на одной карте</span>
+      </h2>
+      <p class="fade-in delay-2 mt-4 text-slate-600 text-lg">Жми на маркер — увидишь активные предложения организации.</p>
+    </div>
+    <div class="fade-in mt-10 rounded-3xl overflow-hidden shadow-card border border-slate-100">
+      <div id="map" style="height: 500px; width: 100%;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== PARTNERS =========================== -->
+<section id="partners" class="py-20 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center">
+      <span class="fade-in badge badge-brand">Партнёры</span>
+      <h2 class="fade-in delay-1 mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
+        Ведущие клиники <span class="grad-text">Астрахани</span>
+      </h2>
+      <p class="fade-in delay-2 mt-4 text-slate-600 text-lg">Мы сотрудничаем с ключевыми медицинскими организациями региона.</p>
+    </div>
+
+    <div class="mt-14 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5">
+      <div class="fade-in card-hover bg-slate-50 rounded-2xl p-5 flex flex-col items-center text-center border border-slate-100">
+        <div class="text-3xl">🏥</div>
+        <div class="mt-2 font-bold text-sm">АМОКБ</div>
+        <div class="text-[11px] text-slate-500">им. А.М. Ничоги</div>
+      </div>
+      <div class="fade-in delay-1 card-hover bg-slate-50 rounded-2xl p-5 flex flex-col items-center text-center border border-slate-100">
+        <div class="text-3xl">🏨</div>
+        <div class="mt-2 font-bold text-sm">ГКБ №1</div>
+        <div class="text-[11px] text-slate-500">им. А.С. Лурии</div>
+      </div>
+      <div class="fade-in delay-2 card-hover bg-slate-50 rounded-2xl p-5 flex flex-col items-center text-center border border-slate-100">
+        <div class="text-3xl">👶</div>
+        <div class="mt-2 font-bold text-sm">Перинатальный центр</div>
+        <div class="text-[11px] text-slate-500">Астрахань</div>
+      </div>
+      <div class="fade-in card-hover bg-slate-50 rounded-2xl p-5 flex flex-col items-center text-center border border-slate-100">
+        <div class="text-3xl">❤️</div>
+        <div class="mt-2 font-bold text-sm">Кардиоцентр</div>
+        <div class="text-[11px] text-slate-500">Астраханская обл.</div>
+      </div>
+      <div class="fade-in delay-1 card-hover bg-slate-50 rounded-2xl p-5 flex flex-col items-center text-center border border-slate-100">
+        <div class="text-3xl">🚑</div>
+        <div class="mt-2 font-bold text-sm">Станция СМП</div>
+        <div class="text-[11px] text-slate-500">Скорая помощь</div>
+      </div>
+      <div class="fade-in delay-2 card-hover bg-slate-50 rounded-2xl p-5 flex flex-col items-center text-center border border-slate-100">
+        <div class="text-3xl">🧬</div>
+        <div class="mt-2 font-bold text-sm">Онкодиспансер</div>
+        <div class="text-[11px] text-slate-500">Астрахань</div>
+      </div>
+    </div>
+
+    <div class="mt-12 text-center">
+      <button onclick="openModal('reviewsModal')" class="btn-ghost inline-flex items-center gap-2">
+        ⭐ Рейтинг всех клиник
+      </button>
+    </div>
+  </div>
+</section>
+<!-- =========================== CTA (конец Части 1 — остальное в Части 2) =========================== -->
+<section class="py-20 grad-brand text-white relative overflow-hidden">
+  <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle at 20% 30%, #fff 0, transparent 40%), radial-gradient(circle at 80% 70%, #fff 0, transparent 40%);"></div>
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
+    <h2 class="fade-in text-3xl sm:text-4xl font-extrabold tracking-tight">Готов найти свою специальность?</h2>
+    <p class="fade-in delay-1 mt-4 text-lg text-white/90">Пройди ИИ-анкету за 6 минут — и получи персональный топ-5 направлений с обоснованием.</p>
+    <div class="fade-in delay-2 mt-8 flex flex-wrap justify-center gap-3">
+      <button onclick="startQuizOrLogin()" class="bg-white text-brand-600 font-bold px-6 py-3 rounded-xl hover:scale-105 transition shadow-lg">Пройти анкету</button>
+      <a href="#modules" class="border border-white/60 text-white font-semibold px-6 py-3 rounded-xl hover:bg-white/10 transition">Узнать больше</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- =========================== FOOTER =========================== -->
+<footer class="bg-slate-900 text-slate-300 pt-14 pb-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid md:grid-cols-4 gap-8">
+      <div>
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl grad-brand flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21s-7-4.35-7-10a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 5.65-7 10-7 10h-4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v6M9 11h6"/></svg>
+          </div>
+          <div class="font-extrabold text-white text-lg">МедОриентир</div>
+        </div>
+        <p class="mt-4 text-sm text-slate-400">Цифровая экосистема Астраханского ГМУ для профориентации и трудоустройства студентов-медиков.</p>
+      </div>
+      <div>
+        <div class="text-white font-semibold">Платформа</div>
+        <ul class="mt-3 space-y-2 text-sm">
+          <li><a href="#concept" class="hover:text-white">О проекте</a></li>
+          <li><a href="#journey" class="hover:text-white">Путь студента</a></li>
+          <li><a href="#quiz-detail" class="hover:text-white">ИИ-анкета</a></li>
+          <li><a href="#modules" class="hover:text-white">Модули</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="text-white font-semibold">Роли</div>
+        <ul class="mt-3 space-y-2 text-sm">
+          <li><a href="#" class="hover:text-white" onclick="openModal('authModal','register');return false;">Студент</a></li>
+          <li><a href="#" class="hover:text-white" onclick="openModal('authModal','register');return false;">Работодатель</a></li>
+          <li><a href="#" class="hover:text-white" onclick="openModal('authModal','login');return false;">Администратор</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="text-white font-semibold">Контакты</div>
+        <ul class="mt-3 space-y-2 text-sm text-slate-400">
+          <li>г. Астрахань, ул. Бакинская, 121</li>
+          <li>medorientir@agmu.ru</li>
+          <li>+7 (8512) 00-00-00</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-10 pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-500">
+      <div>© 2026 МедОриентир · Астраханский ГМУ. Все права защищены.</div>
+      <div>Сделано с ❤️ для будущих врачей</div>
+    </div>
+  </div>
+</footer>
+
+<!-- =========================== AUTH MODAL =========================== -->
+<div id="authModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('authModal')">
+  <div class="modal-box max-w-md">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-brand-600 uppercase tracking-wider" id="authSubtitle">Вход в систему</div>
+          <h3 class="mt-1 text-2xl font-extrabold" id="authTitle">С возвращением!</h3>
+        </div>
+        <button onclick="closeModal('authModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="mt-5 grid grid-cols-2 bg-slate-100 rounded-xl p-1">
+        <button id="tabLogin" onclick="switchAuthTab('login')" class="py-2 rounded-lg text-sm font-semibold bg-white shadow-sm text-brand-600">Вход</button>
+        <button id="tabRegister" onclick="switchAuthTab('register')" class="py-2 rounded-lg text-sm font-semibold text-slate-600">Регистрация</button>
+      </div>
+
+      <!-- Форма -->
+      <form id="authForm" class="mt-5 space-y-3" onsubmit="handleAuth(event)">
+        <div id="regNameField" class="hidden">
+          <label class="text-xs font-semibold text-slate-600">Имя и фамилия</label>
+          <input id="regName" type="text" class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none" placeholder="Иван Иванов"/>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-600">Email</label>
+          <input id="authEmail" type="email" required class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none" placeholder="you@agmu.ru"/>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-600">Пароль</label>
+          <input id="authPassword" type="password" required class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none" placeholder="••••••••"/>
+        </div>
+
+        <!-- Поля регистрации -->
+        <div id="regRoleField" class="hidden">
+          <label class="text-xs font-semibold text-slate-600">Роль</label>
+          <div class="mt-1 grid grid-cols-2 gap-2">
+            <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer hover:border-brand-500">
+              <input type="radio" name="regRole" value="student" checked class="accent-brand-600"/>
+              <div>
+                <div class="text-sm font-semibold">Студент</div>
+                <div class="text-[11px] text-slate-500">Анкета, стажировки</div>
+              </div>
+            </label>
+            <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer hover:border-brand-500">
+              <input type="radio" name="regRole" value="employer" class="accent-brand-600"/>
+              <div>
+                <div class="text-sm font-semibold">Работодатель</div>
+                <div class="text-[11px] text-slate-500">Клиника, вакансии</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div id="regStudentFields" class="hidden grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Факультет</label>
+            <select id="regFaculty" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm">
+              <option>Лечебный</option>
+              <option>Педиатрический</option>
+              <option>Стоматологический</option>
+              <option>Фармацевтический</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Курс</label>
+            <select id="regCourse" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm">
+              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="regEmployerField" class="hidden">
+          <label class="text-xs font-semibold text-slate-600">Название организации</label>
+          <input id="regOrg" type="text" class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none" placeholder="АМОКБ им. А.М. Ничоги"/>
+        </div>
+
+        <div id="authError" class="hidden text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2"></div>
+
+        <button type="submit" class="btn-primary w-full" id="authSubmitBtn">Войти</button>
+
+        <div class="text-xs text-slate-500 bg-slate-50 rounded-lg p-3 border border-slate-100">
+          <div class="font-semibold text-slate-700 mb-1">Тестовые аккаунты:</div>
+          <div>👨‍🎓 Студент: <code class="bg-white px-1 rounded">ivan@agmu.ru</code> / <code class="bg-white px-1 rounded">123</code></div>
+          <div>🏥 Работодатель: <code class="bg-white px-1 rounded">amokb@med.ru</code> / <code class="bg-white px-1 rounded">123</code></div>
+          <div>🛡️ Админ: <code class="bg-white px-1 rounded">admin@agmu.ru</code> / <code class="bg-white px-1 rounded">admin</code></div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- =========================== QUIZ MODAL (оболочка — содержимое в Части 2) =========================== -->
+<div id="quizModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('quizModal')">
+  <div class="modal-box max-w-3xl">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-brand-600 uppercase tracking-wider">ИИ-анкета</div>
+          <h3 class="mt-1 text-2xl font-extrabold" id="quizTitle">Психологический профиль</h3>
+        </div>
+        <button onclick="closeModal('quizModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Steps -->
+      <div class="mt-5 flex items-center justify-between gap-2">
+        <div class="quiz-step-dot active" data-step="1">1</div>
+        <div class="flex-1 h-0.5 bg-slate-200"></div>
+        <div class="quiz-step-dot" data-step="2">2</div>
+        <div class="flex-1 h-0.5 bg-slate-200"></div>
+        <div class="quiz-step-dot" data-step="3">3</div>
+        <div class="flex-1 h-0.5 bg-slate-200"></div>
+        <div class="quiz-step-dot" data-step="4">4</div>
+        <div class="flex-1 h-0.5 bg-slate-200"></div>
+        <div class="quiz-step-dot" data-step="5">5</div>
+      </div>
+
+      <!-- Контейнер шагов (заполняется в Части 2) -->
+      <div id="quizBody" class="mt-6 min-h-[320px]"></div>
+
+      <div class="mt-6 flex items-center justify-between pt-5 border-t border-slate-100">
+        <button id="quizPrev" onclick="quizPrevStep()" class="btn-ghost !py-2 !px-4 text-sm">← Назад</button>
+        <div id="quizProgressText" class="text-xs text-slate-500">Шаг 1 из 5</div>
+        <button id="quizNext" onclick="quizNextStep()" class="btn-primary !py-2 !px-4 text-sm">Далее →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================== RESULTS MODAL (оболочка) =========================== -->
+<div id="resultsModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('resultsModal')">
+  <div class="modal-box max-w-3xl">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-teal-600 uppercase tracking-wider">Результаты ИИ-анкеты</div>
+          <h3 class="mt-1 text-2xl font-extrabold">Твой топ-5 специальностей</h3>
+        </div>
+        <button onclick="closeModal('resultsModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="resultsBody" class="mt-5 space-y-3"></div>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <button onclick="closeModal('resultsModal'); scrollToVacancies()" class="btn-primary">Перейти к стажировкам →</button>
+        <button onclick="closeModal('resultsModal')" class="btn-ghost">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= PROFILE MODAL (студент) ================= -->
+<div id="profileModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('profileModal')">
+  <div class="modal-box max-w-3xl">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-brand-600 uppercase tracking-wider">Личный кабинет</div>
+          <h3 class="mt-1 text-2xl font-extrabold" id="profileTitle">Студент</h3>
+        </div>
+        <button onclick="closeModal('profileModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Шапка профиля -->
+      <div class="mt-5 flex items-center gap-4 p-4 rounded-2xl grad-soft border border-slate-100">
+        <div id="profileBigAvatar" class="w-16 h-16 rounded-2xl grad-brand text-white text-2xl font-bold flex items-center justify-center">И</div>
+        <div class="flex-1">
+          <div id="profileBigName" class="text-lg font-bold">Имя</div>
+          <div id="profileBigMeta" class="text-sm text-slate-600">Факультет · Курс</div>
+        </div>
+        <span class="badge badge-brand">Студент</span>
+      </div>
+
+      <!-- Быстрые действия -->
+      <div class="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <button onclick="openModal('portfolioModal')" class="p-4 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-sky-50 transition text-left">
+          <div class="text-xl">📄</div>
+          <div class="mt-1 text-sm font-semibold">Портфолио</div>
+          <div class="text-[11px] text-slate-500">Редактировать</div>
+        </button>
+        <button onclick="startQuizOrLogin()" class="p-4 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-sky-50 transition text-left">
+          <div class="text-xl">🧭</div>
+          <div class="mt-1 text-sm font-semibold">ИИ-анкета</div>
+          <div class="text-[11px] text-slate-500">Пройти / обновить</div>
+        </button>
+        <button onclick="generatePDFResume()" class="p-4 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-sky-50 transition text-left">
+          <div class="text-xl">📥</div>
+          <div class="mt-1 text-sm font-semibold">PDF-резюме</div>
+          <div class="text-[11px] text-slate-500">Скачать</div>
+        </button>
+        <button onclick="openModal('eventsModal')" class="p-4 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-sky-50 transition text-left">
+          <div class="text-xl">📅</div>
+          <div class="mt-1 text-sm font-semibold">Мероприятия</div>
+          <div class="text-[11px] text-slate-500">Записаться</div>
+        </button>
+      </div>
+
+      <!-- Вкладки -->
+      <div class="mt-6 border-b border-slate-200 flex gap-4">
+        <button class="prof-tab pb-2 text-sm font-semibold border-b-2 border-brand-500 text-brand-600" data-tab="apps">Мои отклики</button>
+        <button class="prof-tab pb-2 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800" data-tab="recs">Рекомендации</button>
+        <button class="prof-tab pb-2 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800" data-tab="events">Мои события</button>
+      </div>
+
+      <div id="profTabApps" class="mt-4 space-y-2"></div>
+      <div id="profTabRecs" class="mt-4 hidden"></div>
+      <div id="profTabEvents" class="mt-4 hidden space-y-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= PORTFOLIO MODAL ================= -->
+<div id="portfolioModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('portfolioModal')">
+  <div class="modal-box max-w-2xl">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-teal-600 uppercase tracking-wider">Портфолио</div>
+          <h3 class="mt-1 text-2xl font-extrabold">Моё резюме</h3>
+        </div>
+        <button onclick="closeModal('portfolioModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <form id="portfolioForm" class="mt-5 space-y-4" onsubmit="savePortfolio(event)">
+        <div>
+          <label class="text-xs font-semibold text-slate-600">🎓 Образование</label>
+          <textarea id="pfEducation" rows="2" class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm" placeholder="Астраханский ГМУ, лечебный факультет, 2021–2027"></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-600">💼 Опыт работы / практики</label>
+          <textarea id="pfExperience" rows="3" class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm" placeholder="Медбрат в терапевтическом отделении ГКБ №1 (лето 2025)..."></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-600">🔬 Научная работа</label>
+          <textarea id="pfScience" rows="2" class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm" placeholder="СНК: «Эффективность новых антикоагулянтов», 2 публикации"></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-600">🛠 Навыки (через запятую)</label>
+          <input id="pfSkills" type="text" class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm" placeholder="ЭКГ, УЗИ, венопункция, английский B2"/>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-600">📝 Рекомендации</label>
+          <textarea id="pfRefs" rows="2" class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm" placeholder="к.м.н. Сидоров А.П., зав. отделением кардиологии АМОКБ"></textarea>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="btn-primary flex-1">💾 Сохранить</button>
+          <button type="button" onclick="generatePDFResume()" class="btn-ghost">📥 PDF</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ================= EMPLOYER MODAL ================= -->
+<div id="employerModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('employerModal')">
+  <div class="modal-box max-w-4xl">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-teal-600 uppercase tracking-wider">Кабинет работодателя</div>
+          <h3 class="mt-1 text-2xl font-extrabold" id="empTitle">Организация</h3>
+        </div>
+        <button onclick="closeModal('employerModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Вкладки -->
+      <div class="mt-5 border-b border-slate-200 flex gap-4">
+        <button class="emp-tab pb-2 text-sm font-semibold border-b-2 border-brand-500 text-brand-600" data-tab="vacs">Мои вакансии</button>
+        <button class="emp-tab pb-2 text-sm font-semibold border-b-2 border-transparent text-slate-500" data-tab="apps">Отклики</button>
+        <button class="emp-tab pb-2 text-sm font-semibold border-b-2 border-transparent text-slate-500" data-tab="add">+ Добавить</button>
+      </div>
+
+      <div id="empTabVacs" class="mt-4 space-y-2"></div>
+      <div id="empTabApps" class="mt-4 hidden space-y-2"></div>
+      <div id="empTabAdd" class="mt-4 hidden">
+        <form onsubmit="addVacancy(event)" class="space-y-3">
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Название</label>
+            <input id="vacTitle" required class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm" placeholder="Стажировка в кардиологии"/>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Описание</label>
+            <textarea id="vacDesc" required rows="3" class="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-600">Тип</label>
+              <select id="vacType" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none text-sm">
+                <option value="internship">Стажировка</option>
+                <option value="volunteer">Волонтёрство</option>
+                <option value="job">Вакансия</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600">Специальность</label>
+              <select id="vacSpec" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none text-sm">
+                <option>Кардиология</option><option>Хирургия</option><option>Терапия</option>
+                <option>Неврология</option><option>Педиатрия</option><option>Анестезиология</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary w-full">Опубликовать вакансию</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD MODAL (админ) ================= -->
+<div id="dashboardModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('dashboardModal')">
+  <div class="modal-box max-w-5xl">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-amber-600 uppercase tracking-wider">Админ-панель</div>
+          <h3 class="mt-1 text-2xl font-extrabold">Аналитика платформы</h3>
+        </div>
+        <button onclick="closeModal('dashboardModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- KPI -->
+      <div class="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="p-4 rounded-xl bg-sky-50 border border-sky-100">
+          <div class="text-xs text-slate-600">Студентов</div>
+          <div id="kpiStudents" class="text-2xl font-extrabold text-brand-600 mt-1">0</div>
+        </div>
+        <div class="p-4 rounded-xl bg-teal-50 border border-teal-100">
+          <div class="text-xs text-slate-600">Работодателей</div>
+          <div id="kpiEmployers" class="text-2xl font-extrabold text-teal-600 mt-1">0</div>
+        </div>
+        <div class="p-4 rounded-xl bg-amber-50 border border-amber-100">
+          <div class="text-xs text-slate-600">Вакансий</div>
+          <div id="kpiVacancies" class="text-2xl font-extrabold text-amber-600 mt-1">0</div>
+        </div>
+        <div class="p-4 rounded-xl bg-rose-50 border border-rose-100">
+          <div class="text-xs text-slate-600">Откликов</div>
+          <div id="kpiApps" class="text-2xl font-extrabold text-rose-600 mt-1">0</div>
+        </div>
+      </div>
+
+      <!-- Распределение -->
+      <div class="mt-6 p-5 rounded-2xl bg-slate-50 border border-slate-100">
+        <div class="font-bold">Распределение студентов по предпочтениям</div>
+        <div id="specChart" class="mt-4 space-y-2"></div>
+      </div>
+
+      <!-- Таблица пользователей -->
+      <div class="mt-6">
+        <div class="font-bold">Пользователи</div>
+        <div class="mt-3 overflow-x-auto border border-slate-200 rounded-xl">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+              <tr>
+                <th class="text-left px-4 py-2">Имя</th>
+                <th class="text-left px-4 py-2">Email</th>
+                <th class="text-left px-4 py-2">Роль</th>
+                <th class="text-left px-4 py-2">Дата</th>
+              </tr>
+            </thead>
+            <tbody id="usersTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Добавление мероприятия -->
+      <div class="mt-6 p-5 rounded-2xl bg-slate-50 border border-slate-100">
+        <div class="font-bold">+ Добавить мероприятие</div>
+        <form onsubmit="addEvent(event)" class="mt-3 grid md:grid-cols-2 gap-3">
+          <input id="evTitle" required placeholder="Название" class="px-3 py-2 rounded-lg border border-slate-200 text-sm"/>
+          <input id="evDate" type="date" required class="px-3 py-2 rounded-lg border border-slate-200 text-sm"/>
+          <input id="evOrg" required placeholder="Организатор" class="px-3 py-2 rounded-lg border border-slate-200 text-sm md:col-span-2"/>
+          <textarea id="evDesc" required placeholder="Описание" rows="2" class="px-3 py-2 rounded-lg border border-slate-200 text-sm md:col-span-2"></textarea>
+          <button class="btn-primary md:col-span-2">Добавить</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= REVIEWS MODAL ================= -->
+<div id="reviewsModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('reviewsModal')">
+  <div class="modal-box max-w-3xl">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-amber-600 uppercase tracking-wider">Рейтинг</div>
+          <h3 class="mt-1 text-2xl font-extrabold">Отзывы о клиниках</h3>
+        </div>
+        <button onclick="closeModal('reviewsModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="reviewsList" class="mt-5 space-y-3"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= EVENTS MODAL ================= -->
+<div id="eventsModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('eventsModal')">
+  <div class="modal-box max-w-3xl">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Календарь</div>
+          <h3 class="mt-1 text-2xl font-extrabold">Мероприятия</h3>
+        </div>
+        <button onclick="closeModal('eventsModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="eventsList" class="mt-5 space-y-3"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= VACANCY DETAILS MODAL ================= -->
+<div id="vacancyModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('vacancyModal')">
+  <div class="modal-box max-w-2xl">
+    <div class="p-6" id="vacancyBody"></div>
+  </div>
+</div>
+
+<!-- ================= NOTIFICATIONS MODAL ================= -->
+<div id="notifModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('notifModal')">
+  <div class="modal-box max-w-md">
+    <div class="p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold text-brand-600 uppercase tracking-wider">Уведомления</div>
+          <h3 class="mt-1 text-2xl font-extrabold">Колокольчик</h3>
+        </div>
+        <button onclick="closeModal('notifModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="notifList" class="mt-5 space-y-2"></div>
+      <button onclick="markAllRead()" class="mt-4 text-sm text-brand-600 font-semibold hover:underline">Отметить все как прочитанные</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CHAT MODAL ================= -->
+<div id="chatModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('chatModal')">
+  <div class="modal-box max-w-lg" style="max-height: 80vh;">
+    <div class="p-5 flex flex-col" style="height: 600px;">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xs text-slate-500">Чат с</div>
+          <div id="chatPartner" class="font-bold">Работодатель</div>
+        </div>
+        <button onclick="closeModal('chatModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="chatMessages" class="flex-1 overflow-y-auto mt-4 space-y-2 pr-2"></div>
+      <form onsubmit="sendChatMessage(event)" class="mt-3 flex gap-2">
+        <input id="chatInput" required placeholder="Напиши сообщение..." class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm"/>
+        <button class="btn-primary !py-2.5 !px-4">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Плавающий чат (кнопка) -->
+<button id="chatFab" class="chat-fab hidden" onclick="openChat()" title="Открыть чат">
+  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 0 1-4-.8L3 20l1.3-3.9A7.7 7.7 0 0 1 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+</button>
+
+<!-- Контейнер для тостов -->
+<div id="toastContainer" class="fixed top-4 right-4 z-[100] space-y-2"></div>
+
+<!-- Контейнер для печати PDF-резюме -->
+<div id="printArea" class="hidden"></div>
+
+<!-- =========================================================
+     JAVASCRIPT · Часть 1 (продолжение в следующих частях)
+     ========================================================= -->
+<script>
+/* =========================================================
+   1. ГЛОБАЛЬНОЕ СОСТОЯНИЕ И ХРАНИЛИЩЕ
+   ========================================================= */
+const LS_KEYS = {
+  users: 'mo_users',
+  session: 'mo_session',
+  vacancies: 'mo_vacancies',
+  applications: 'mo_applications',
+  reviews: 'mo_reviews',
+  events: 'mo_events',
+  eventRegs: 'mo_eventRegs',
+  notifications: 'mo_notifications',
+  quizAnswers: (id) => `mo_quiz_${id}`,
+  portfolio: (id) => `mo_portfolio_${id}`,
+  chat: (a,b) => `mo_chat_${[a,b].sort().join('_')}`,
+};
+
+const STATE = {
+  currentUser: null,
+  quizStep: 1,
+  quizAnswers: {},
+};
+
+/* =========================================================
+   2. УТИЛИТЫ
+   ========================================================= */
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const uid = () => Math.random().toString(36).slice(2,10);
+const ls = {
+  get: (k, def=null) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch(e){ return def; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+  del: (k) => localStorage.removeItem(k),
+};
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = (d) => { const x = new Date(d); return x.toLocaleDateString('ru-RU',{day:'2-digit',month:'short'}) + ', ' + x.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); };
+
+/* =========================================================
+   3. ИНИЦИАЛИЗАЦИЯ ДЕФОЛТНЫХ ДАННЫХ
+   ========================================================= */
+function seedDefaults(){
+  // Пользователи
+  if (!ls.get(LS_KEYS.users)) {
+    const users = [
+      { id:'u_student', email:'ivan@agmu.ru', password:'123', role:'student', name:'Иван Петров', faculty:'Лечебный', course:4, createdAt: Date.now() },
+      { id:'u_employer', email:'amokb@med.ru', password:'123', role:'employer', name:'АМОКБ им. А.М. Ничоги', org:'АМОКБ', createdAt: Date.now() },
+      { id:'u_admin', email:'admin@agmu.ru', password:'admin', role:'admin', name:'Администратор Астраханского ГМУ', createdAt: Date.now() },
+      // Дополнительные работодатели для карты и рейтинга
+      { id:'u_emp2', email:'kb1@med.ru', password:'123', role:'employer', name:'ГКБ №1 им. А.С. Лурии', org:'ГКБ №1', createdAt: Date.now() },
+      { id:'u_emp3', email:'perinatal@med.ru', password:'123', role:'employer', name:'Перинатальный центр', org:'Перинатальный центр', createdAt: Date.now() },
+    ];
+    ls.set(LS_KEYS.users, users);
+  }
+  // Вакансии
+  if (!ls.get(LS_KEYS.vacancies)) {
+    const v = [
+      { id:'v1', title:'Стажировка в кардиологическом отделении', desc:'Работа с ЭКГ, эхоКГ, ведение пациентов под руководством врача.', type:'internship', org:'АМОКБ', specialty:'Кардиология', employerId:'u_employer', lat:46.3478, lng:48.0573, createdAt: Date.now() },
+      { id:'v2', title:'Волонтёр в приёмном отделении', desc:'Помощь в навигации пациентов, оформление документов.', type:'volunteer', org:'ГКБ №1', specialty:'Терапия', employerId:'u_emp2', lat:46.3521, lng:48.0445, createdAt: Date.now() },
+      { id:'v3', title:'Младший ординатор (хирургия)', desc:'Полноценная ставка с наставничеством. Требования: 6 курс, наличие базовых навыков.', type:'job', org:'АМОКБ', specialty:'Хирургия', employerId:'u_employer', lat:46.3478, lng:48.0573, createdAt: Date.now() },
+      { id:'v4', title:'Стажировка в неврологии', desc:'Разбор клинических случаев, работа с КТ/МРТ.', type:'internship', org:'ГКБ №1', specialty:'Неврология', employerId:'u_emp2', lat:46.3521, lng:48.0445, createdAt: Date.now() },
+      { id:'v5', title:'Волонтёр в перинатальном центре', desc:'Поддержка молодых мам, помощь в школе материнства.', type:'volunteer', org:'Перинатальный центр', specialty:'Педиатрия', employerId:'u_emp3', lat:46.3402, lng:48.0621, createdAt: Date.now() },
+    ];
+    ls.set(LS_KEYS.vacancies, v);
+  }
+  // Мероприятия
+  if (!ls.get(LS_KEYS.events)) {
+    const e = [
+      { id:'e1', title:'День карьеры «Медицина 2026»', desc:'Крупнейшее событие года: 20+ клиник, мастер-классы, собеседования.', date: '2026-06-20', org:'Астраханский ГМУ', authorId:'u_admin' },
+      { id:'e2', title:'Вебинар: «Как выбрать ординатуру»', desc:'Разбор специальностей, реальные истории ординаторов.', date: '2026-06-15', org:'Астраханский ГМУ', authorId:'u_admin' },
+      { id:'e3', title:'Мастер-класс по УЗИ-диагностике', desc:'Практическое занятие на симуляторе.', date: '2026-06-25', org:'АМОКБ', authorId:'u_employer' },
+    ];
+    ls.set(LS_KEYS.events, e);
+  }
+  // Уведомления
+  if (!ls.get(LS_KEYS.notifications)) ls.set(LS_KEYS.notifications, []);
+  // Отклики, отзывы, регистрации
+  if (!ls.get(LS_KEYS.applications)) ls.set(LS_KEYS.applications, []);
+  if (!ls.get(LS_KEYS.reviews)) ls.set(LS_KEYS.reviews, []);
+  if (!ls.get(LS_KEYS.eventRegs)) ls.set(LS_KEYS.eventRegs, []);
+}
+
+/* =========================================================
+   4. МОДАЛЬНЫЕ ОКНА
+   ========================================================= */
+function openModal(id, param){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  if (id === 'authModal' && param) switchAuthTab(param);
+  if (id === 'quizModal') renderQuizStep();
+}
+function closeModal(id){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') $$('.modal-backdrop.open').forEach(m => m.classList.remove('open'));
+  document.body.style.overflow = $$('.modal-backdrop.open').length ? 'hidden' : '';
+});
+
+/* =========================================================
+   5. АВТОРИЗАЦИЯ
+   ========================================================= */
+let authMode = 'login';
+function switchAuthTab(mode){
+  authMode = mode;
+  const isReg = mode === 'register';
+  $('#tabLogin').classList.toggle('bg-white', !isReg); $('#tabLogin').classList.toggle('shadow-sm', !isReg); $('#tabLogin').classList.toggle('text-brand-600', !isReg);
+  $('#tabRegister').classList.toggle('bg-white', isReg); $('#tabRegister').classList.toggle('shadow-sm', isReg); $('#tabRegister').classList.toggle('text-brand-600', isReg);
+  $('#authTitle').textContent = isReg ? 'Создай аккаунт' : 'С возвращением!';
+  $('#authSubtitle').textContent = isReg ? 'Регистрация' : 'Вход в систему';
+  $('#authSubmitBtn').textContent = isReg ? 'Зарегистрироваться' : 'Войти';
+  $('#regNameField').classList.toggle('hidden', !isReg);
+  $('#regRoleField').classList.toggle('hidden', !isReg);
+  $('#regStudentFields').classList.toggle('hidden', !(isReg && document.querySelector('input[name=regRole]:checked')?.value === 'student'));
+  $('#regEmployerField').classList.toggle('hidden', !(isReg && document.querySelector('input[name=regRole]:checked')?.value === 'employer'));
+  $('#authError').classList.add('hidden');
+}
+document.addEventListener('change', (e) => {
+  if (e.target.name === 'regRole') {
+    const v = e.target.value;
+    $('#regStudentFields').classList.toggle('hidden', v !== 'student');
+    $('#regEmployerField').classList.toggle('hidden', v !== 'employer');
+  }
+});
+
+function handleAuth(e){
+  e.preventDefault();
+  const email = $('#authEmail').value.trim().toLowerCase();
+  const password = $('#authPassword').value;
+  const errBox = $('#authError');
+  errBox.classList.add('hidden');
+
+  const users = ls.get(LS_KEYS.users, []);
+
+  if (authMode === 'login') {
+    const u = users.find(x => x.email === email && x.password === password);
+    if (!u) { errBox.textContent = 'Неверный email или пароль'; errBox.classList.remove('hidden'); return; }
+    loginAs(u);
+  } else {
+    if (users.some(x => x.email === email)) { errBox.textContent = 'Пользователь с таким email уже существует'; errBox.classList.remove('hidden'); return; }
+    const name = $('#regName').value.trim();
+    const role = document.querySelector('input[name=regRole]:checked').value;
+    if (!name) { errBox.textContent = 'Укажи имя'; errBox.classList.remove('hidden'); return; }
+    const newUser = { id:'u_'+uid(), email, password, role, name, createdAt: Date.now() };
+    if (role === 'student') {
+      newUser.faculty = $('#regFaculty').value;
+      newUser.course = $('#regCourse').value;
+    } else {
+      const org = $('#regOrg').value.trim();
+      if (!org) { errBox.textContent = 'Укажи организацию'; errBox.classList.remove('hidden'); return; }
+      newUser.org = org;
+    }
+    users.push(newUser);
+    ls.set(LS_KEYS.users, users);
+    addNotification(newUser.id, 'Добро пожаловать в МедОриентир! 🎉 Пройди ИИ-анкету, чтобы получить рекомендации.');
+    loginAs(newUser);
+  }
+}
+
+function loginAs(user){
+  STATE.currentUser = user;
+  ls.set(LS_KEYS.session, { id: user.id });
+  closeModal('authModal');
+  renderHeaderAuth();
+  showToast(`Привет, ${user.name.split(' ')[0]}! 👋`);
+  if (user.role === 'student') {
+    // Если анкета уже пройдена — предлагаем результаты
+    const ans = ls.get(LS_KEYS.quizAnswers(user.id));
+    if (ans) addNotification(user.id, 'Твои рекомендации по специальностям всё ещё актуальны.');
+  }
+}
+
+function logout(){
+  STATE.currentUser = null;
+  ls.del(LS_KEYS.session);
+  renderHeaderAuth();
+  showToast('Вы вышли из системы');
+}
+
+function renderHeaderAuth(){
+  const u = STATE.currentUser;
+  const authArea = $('#authArea');
+  const profileArea = $('#profileArea');
+  const chatFab = $('#chatFab');
+  if (!u) {
+    authArea.classList.remove('hidden'); authArea.classList.add('flex');
+    profileArea.classList.add('hidden'); profileArea.classList.remove('flex');
+    chatFab.classList.add('hidden');
+  } else {
+    authArea.classList.add('hidden'); authArea.classList.remove('flex');
+    profileArea.classList.remove('hidden'); profileArea.classList.add('flex');
+    $('#profileName').textContent = u.name;
+    $('#profileAvatar').textContent = (u.name[0] || 'У').toUpperCase();
+    if (u.role === 'student') chatFab.classList.remove('hidden');
+    else chatFab.classList.add('hidden');
+  }
+  renderNotifDot();
+}
+
+function openProfileForCurrentUser(){
+  const u = STATE.currentUser;
+  if (!u) return;
+  if (u.role === 'student') openModal('profileModal');
+  else if (u.role === 'employer') openModal('employerModal');
+  else if (u.role === 'admin') openModal('dashboardModal');
+}
+
+/* =========================================================
+   6. УВЕДОМЛЕНИЯ
+   ========================================================= */
+function addNotification(userId, text){
+  const all = ls.get(LS_KEYS.notifications, []);
+  all.push({ id: uid(), userId, text, date: Date.now(), read: false });
+  ls.set(LS_KEYS.notifications, all);
+  renderNotifDot();
+}
+function renderNotifDot(){
+  const u = STATE.currentUser;
+  const dot = $('#notifDot');
+  if (!u) { dot.classList.add('hidden'); return; }
+  const all = ls.get(LS_KEYS.notifications, []);
+  const unread = all.filter(n => n.userId === u.id && !n.read).length;
+  if (unread > 0) { dot.classList.remove('hidden'); dot.textContent = unread > 9 ? '9+' : unread; }
+  else dot.classList.add('hidden');
+}
+
+/* =========================================================
+   7. ТОСТЫ
+   ========================================================= */
+function showToast(text, type='success'){
+  const colors = { success:'border-teal-500', error:'border-rose-500', info:'border-brand-500' };
+  const t = document.createElement('div');
+  t.className = `toast ${colors[type] || colors.success}`;
+  t.innerHTML = `<div class="text-sm font-semibold text-slate-800">${escapeHtml(text)}</div>`;
+  $('#toastContainer').appendChild(t);
+  setTimeout(() => { t.style.transition='opacity .3s, transform .3s'; t.style.opacity='0'; t.style.transform='translateX(120%)'; }, 3200);
+  setTimeout(() => t.remove(), 3600);
+}
+
+/* =========================================================
+   8. АНИМАЦИЯ ПОЯВЛЕНИЯ ПРИ СКРОЛЛЕ
+   ========================================================= */
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+}, { threshold: 0.12 });
+function initScrollAnimations(){ $$('.fade-in').forEach(el => io.observe(el)); }
+
+/* =========================================================
+   9. МОБИЛЬНОЕ МЕНЮ
+   ========================================================= */
+$('#burger').addEventListener('click', () => $('#mobileMenu').classList.toggle('open'));
+$$('#mobileMenu a').forEach(a => a.addEventListener('click', () => $('#mobileMenu').classList.remove('open')));
+
+/* =========================================================
+   10. ЗАПУСК / СТАРТ АНКЕТЫ
+   ========================================================= */
+function startQuizOrLogin(){
+  const u = STATE.currentUser;
+  if (!u) { openModal('authModal','register'); return; }
+  if (u.role !== 'student') { showToast('Анкета доступна только студентам', 'info'); return; }
+  openModal('quizModal');
+}
+function scrollToVacancies(){
+  // В Части 2 будет реализован каталог вакансий — якорь #vacancies
+  const el = document.getElementById('vacancies');
+  if (el) el.scrollIntoView({behavior:'smooth'});
+  else showToast('Каталог стажировок загружается…', 'info');
+}
+
+/* =========================================================
+   11. КАТАЛОГ ВАКАНСИЙ
+   ========================================================= */
+const VAC_TYPE_LABELS = {
+  internship: { label: 'Стажировка', icon: '🎓', color: 'badge-brand' },
+  volunteer:  { label: 'Волонтёрство', icon: '🤝', color: 'badge-teal' },
+  job:        { label: 'Вакансия', icon: '💼', color: 'badge-amber' },
+};
+
+let vacFilter = 'all';
+let specFilterVal = 'all';
+
+function renderVacancies(){
+  const list = $('#vacanciesList');
+  const empty = $('#vacanciesEmpty');
+  if (!list) return;
+  const all = ls.get(LS_KEYS.vacancies, []);
+  const filtered = all.filter(v => {
+    if (vacFilter !== 'all' && v.type !== vacFilter) return false;
+    if (specFilterVal !== 'all' && v.specialty !== specFilterVal) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  list.innerHTML = filtered.map(v => {
+    const t = VAC_TYPE_LABELS[v.type] || VAC_TYPE_LABELS.internship;
+    return `
+      <div class="fade-in visible card-hover bg-white rounded-2xl p-5 border border-slate-100 shadow-card flex flex-col">
+        <div class="flex items-start justify-between">
+          <span class="badge ${t.color}">${t.icon} ${t.label}</span>
+          <span class="text-xs text-slate-500">${escapeHtml(v.org)}</span>
+        </div>
+        <h3 class="mt-3 font-bold text-lg leading-snug">${escapeHtml(v.title)}</h3>
+        <p class="mt-1 text-sm text-slate-600 line-clamp-2 flex-1">${escapeHtml(v.desc)}</p>
+        <div class="mt-3 flex items-center gap-2 text-xs text-slate-500">
+          <span class="badge badge-teal">🎯 ${escapeHtml(v.specialty)}</span>
+        </div>
+        <div class="mt-4 flex gap-2">
+          <button onclick="openVacancyDetails('${v.id}')" class="btn-ghost flex-1 !py-2 text-sm">Подробнее</button>
+          <button onclick="applyToVacancy('${v.id}')" class="btn-primary flex-1 !py-2 text-sm">Откликнуться</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openVacancyDetails(id){
+  const v = ls.get(LS_KEYS.vacancies, []).find(x => x.id === id);
+  if (!v) return;
+  const t = VAC_TYPE_LABELS[v.type] || VAC_TYPE_LABELS.internship;
+  $('#vacancyBody').innerHTML = `
+    <div class="flex items-start justify-between">
+      <div>
+        <span class="badge ${t.color}">${t.icon} ${t.label}</span>
+        <h3 class="mt-2 text-2xl font-extrabold">${escapeHtml(v.title)}</h3>
+        <div class="mt-1 text-sm text-slate-600">${escapeHtml(v.org)} · ${escapeHtml(v.specialty)}</div>
+      </div>
+      <button onclick="closeModal('vacancyModal')" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="mt-5 p-4 rounded-xl bg-slate-50 border border-slate-100">
+      <div class="text-xs font-semibold text-slate-500 uppercase">Описание</div>
+      <p class="mt-1 text-sm text-slate-700">${escapeHtml(v.desc)}</p>
+    </div>
+    <div class="mt-5 flex gap-3">
+      <button onclick="applyToVacancy('${v.id}'); closeModal('vacancyModal');" class="btn-primary flex-1">Откликнуться</button>
+      <button onclick="openChatWith('${v.employerId}'); closeModal('vacancyModal');" class="btn-ghost flex-1">💬 Написать</button>
+    </div>
+  `;
+  openModal('vacancyModal');
+}
+
+function applyToVacancy(id){
+  const u = STATE.currentUser;
+  if (!u) { openModal('authModal','login'); return; }
+  if (u.role !== 'student') { showToast('Откликаться могут только студенты', 'error'); return; }
+  const apps = ls.get(LS_KEYS.applications, []);
+  if (apps.some(a => a.vacancyId === id && a.studentId === u.id)) {
+    showToast('Ты уже откликнулся на эту вакансию', 'info'); return;
+  }
+  const v = ls.get(LS_KEYS.vacancies, []).find(x => x.id === id);
+  if (!v) return;
+  apps.push({ id: uid(), studentId: u.id, vacancyId: id, title: v.title, org: v.org, employerId: v.employerId, date: Date.now() });
+  ls.set(LS_KEYS.applications, apps);
+  addNotification(u.id, `✅ Ты откликнулся: «${v.title}» в ${v.org}`);
+  addNotification(v.employerId, `📨 Новый отклик: ${u.name} на «${v.title}»`);
+  showToast('Отклик отправлен! 🎉');
+  renderVacancies();
+  renderProfile();
+}
+
+/* =========================================================
+   12. ЛИЧНЫЙ КАБИНЕТ СТУДЕНТА
+   ========================================================= */
+function renderProfile(){
+  const u = STATE.currentUser;
+  if (!u || u.role !== 'student') return;
+  $('#profileTitle').textContent = u.name;
+  $('#profileBigName').textContent = u.name;
+  $('#profileBigMeta').textContent = `${u.faculty || '—'} факультет · ${u.course || '—'} курс`;
+  $('#profileBigAvatar').textContent = (u.name[0] || 'У').toUpperCase();
+
+  // Отклики
+  const apps = ls.get(LS_KEYS.applications, []).filter(a => a.studentId === u.id);
+  $('#profTabApps').innerHTML = apps.length
+    ? apps.map(a => `
+        <div class="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-white">
+          <div>
+            <div class="font-semibold text-sm">${escapeHtml(a.title)}</div>
+            <div class="text-xs text-slate-500">${escapeHtml(a.org)} · ${fmtDate(a.date)}</div>
+          </div>
+          <span class="badge badge-teal">Отправлен</span>
+        </div>`).join('')
+    : '<div class="text-center text-slate-500 py-8 text-sm">Пока нет откликов. <a href="#vacancies" class="text-brand-600 font-semibold hover:underline">Смотреть вакансии →</a></div>';
+
+  // Рекомендации
+  const ans = ls.get(LS_KEYS.quizAnswers(u.id));
+  $('#profTabRecs').innerHTML = ans
+    ? '<div class="text-sm text-slate-600">Твои рекомендации обновлены. Нажми «Пройти анкету», чтобы пересчитать.</div>'
+    : '<div class="text-sm text-slate-500">Ты ещё не проходил анкету. <button onclick="closeModal(\'profileModal\'); startQuizOrLogin();" class="text-brand-600 font-semibold hover:underline">Пройти →</button></div>';
+
+  // События
+  const regs = ls.get(LS_KEYS.eventRegs, []).filter(r => r.studentId === u.id);
+  const events = ls.get(LS_KEYS.events, []);
+  $('#profTabEvents').innerHTML = regs.length
+    ? regs.map(r => {
+        const e = events.find(x => x.id === r.eventId);
+        if (!e) return '';
+        return `<div class="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-white">
+          <div>
+            <div class="font-semibold text-sm">${escapeHtml(e.title)}</div>
+            <div class="text-xs text-slate-500">📅 ${e.date} · ${escapeHtml(e.org)}</div>
+          </div>
+          <span class="badge badge-teal">Записан</span>
+        </div>`;
+      }).join('')
+    : '<div class="text-center text-slate-500 py-8 text-sm">Ты ни на что не записан. <button onclick="closeModal(\'profileModal\'); openModal(\'eventsModal\');" class="text-brand-600 font-semibold hover:underline">Смотреть →</button></div>';
+}
+
+// Табы профиля
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.prof-tab');
+  if (!tab) return;
+  $$('.prof-tab').forEach(t => { t.classList.remove('border-brand-500','text-brand-600'); t.classList.add('border-transparent','text-slate-500'); });
+  tab.classList.add('border-brand-500','text-brand-600'); tab.classList.remove('border-transparent','text-slate-500');
+  $('#profTabApps').classList.toggle('hidden', tab.dataset.tab !== 'apps');
+  $('#profTabRecs').classList.toggle('hidden', tab.dataset.tab !== 'recs');
+  $('#profTabEvents').classList.toggle('hidden', tab.dataset.tab !== 'events');
+});
+
+/* =========================================================
+   13. ПОРТФОЛИО
+   ========================================================= */
+function loadPortfolio(){
+  const u = STATE.currentUser;
+  if (!u) return;
+  const p = ls.get(LS_KEYS.portfolio(u.id), {});
+  $('#pfEducation').value = p.education || '';
+  $('#pfExperience').value = p.experience || '';
+  $('#pfScience').value = p.science || '';
+  $('#pfSkills').value = p.skills || '';
+  $('#pfRefs').value = p.refs || '';
+}
+function savePortfolio(e){
+  e.preventDefault();
+  const u = STATE.currentUser;
+  if (!u) return;
+  const data = {
+    education: $('#pfEducation').value,
+    experience: $('#pfExperience').value,
+    science: $('#pfScience').value,
+    skills: $('#pfSkills').value,
+    refs: $('#pfRefs').value,
+  };
+  ls.set(LS_KEYS.portfolio(u.id), data);
+  showToast('Портфолио сохранено 💾');
+  closeModal('portfolioModal');
+}
+
+/* =========================================================
+   33. ПРОФЕССИОНАЛЬНАЯ ГЕНЕРАЦИЯ PDF-РЕЗЮМЕ
+   ========================================================= */
+function generatePDFResume() {
+  const u = STATE.currentUser;
+  if (!u) { openModal('authModal', 'login'); return; }
+  
+  const p = ls.get(LS_KEYS.portfolio(u.id), {});
+  const ans = ls.get(LS_KEYS.quizAnswers(u.id), {});
+  const recs = ans.recommendations || [];
+  const apps = ls.get(LS_KEYS.applications, []).filter(a => a.studentId === u.id);
+
+  // Формируем красивый HTML для печати
+  const html = `
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+      <meta charset="UTF-8">
+      <title>Резюме — ${escapeHtml(u.name)}</title>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; color: #0f172a; line-height: 1.5; padding: 40px; max-width: 800px; margin: 0 auto; }
+        .header { border-bottom: 3px solid #0284c7; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .name { font-size: 32px; font-weight: 800; color: #0284c7; margin-bottom: 8px; }
+        .meta { font-size: 14px; color: #64748b; }
+        .badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-top: 8px; }
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 16px; font-weight: 700; color: #0284c7; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; border-left: 4px solid #14b8a6; padding-left: 12px; }
+        .text { font-size: 14px; color: #334155; white-space: pre-wrap; }
+        .skills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .skill-tag { background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 500; }
+        .rec-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+        .rec-name { font-weight: 600; }
+        .rec-score { color: #0284c7; font-weight: 700; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8; }
+        @media print {
+          body { padding: 0; }
+          .no-print { display: none !important; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <div class="name">${escapeHtml(u.name)}</div>
+          <div class="meta">${escapeHtml(u.email)} · ${escapeHtml(u.faculty || 'Медвуз')} · ${escapeHtml(u.course || '')} курс</div>
+          <div class="badge">Студент-медик · Астраханский ГМУ</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 12px; color: #94a3b8;">Сформировано в системе</div>
+          <div style="font-size: 14px; font-weight: 600; color: #0284c7;">МедОриентир</div>
+        </div>
+      </div>
+
+      ${p.education ? `<div class="section"><div class="section-title">🎓 Образование</div><div class="text">${escapeHtml(p.education)}</div></div>` : ''}
+      
+      ${p.experience ? `<div class="section"><div class="section-title">💼 Практический опыт</div><div class="text">${escapeHtml(p.experience)}</div></div>` : ''}
+      
+      ${p.science ? `<div class="section"><div class="section-title">🔬 Научная деятельность</div><div class="text">${escapeHtml(p.science)}</div></div>` : ''}
+      
+      ${p.skills ? `<div class="section"><div class="section-title">🛠 Профессиональные навыки</div><div class="skills">${escapeHtml(p.skills).split(',').map(s => `<span class="skill-tag">${s.trim()}</span>`).join('')}</div></div>` : ''}
+      
+      ${p.refs ? `<div class="section"><div class="section-title">📝 Рекомендации</div><div class="text">${escapeHtml(p.refs)}</div></div>` : ''}
+
+      ${apps.length ? `<div class="section"><div class="section-title">📋 Активные отклики (${apps.length})</div>
+        ${apps.slice(0, 5).map(a => `<div class="text" style="margin-bottom: 4px;">• ${escapeHtml(a.title)} <span style="color:#64748b">(${escapeHtml(a.org)})</span></div>`).join('')}
+      </div>` : ''}
+
+      ${recs.length ? `<div class="section"><div class="section-title">🧭 ИИ-рекомендации по специализации</div>
+        ${recs.slice(0, 3).map(r => `<div class="rec-item"><span class="rec-name">${r.emoji} ${escapeHtml(r.name)}</span><span class="rec-score">${r.score}% совпадение</span></div>`).join('')}
+      </div>` : ''}
+
+      <div class="footer">
+        Документ сгенерирован автоматически на основе данных профиля и ИИ-анкеты платформы «МедОриентир».<br>
+        Дата формирования: ${new Date().toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' })}
+      </div>
+
+      <div class="no-print" style="position: fixed; bottom: 20px; right: 20px;">
+        <button onclick="window.print()" style="background: #0284c7; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(2,132,199,0.4);">
+          🖨 Печать / Сохранить в PDF
+        </button>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const printWindow = window.open('', '_blank', 'width=800,height=900');
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+    // Авто-печать после загрузки шрифтов
+    printWindow.onload = () => {
+      setTimeout(() => printWindow.print(), 500);
+    };
+  } else {
+    showToast('Разрешите всплывающие окна для сохранения PDF', 'error');
+  }
+}
+
+/* =========================================================
+   34. ОБРАБОТКА КРАЕВЫХ СЛУЧАЕВ И БЕЗОПАСНОСТЬ
+   ========================================================= */
+
+// Безопасная запись в localStorage с обработкой переполнения квоты
+const _lsSet = ls.set;
+ls.set = function(key, value) {
+  try {
+    _lsSet(key, value);
+  } catch (e) {
+    if (e.name === 'QuotaExceededError') {
+      showToast('Хранилище браузера переполнено. Очистите кэш или удалите старые данные.', 'error');
+      console.warn('localStorage quota exceeded');
+    } else {
+      console.error('localStorage error:', e);
+    }
+  }
+};
+
+// Защита от XSS при вставке HTML (уже используется, но продублируем для надёжности)
+function safeHTML(str) {
+  return escapeHtml(str || '');
+}
+
+// Предотвращение двойных кликов по кнопкам отправки
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[type="submit"]');
+  if (btn && !btn.disabled) {
+    // Простая защита: если кнопка уже имеет класс loading, игнорируем
+    if (btn.classList.contains('loading')) {
+      e.preventDefault();
+      return;
+    }
+    // Можно добавить визуальный фидбек, если форма тяжелая
+  }
+});
+
+/* =========================================================
+   35. ФИНАЛЬНЫЕ ПОЛИРОВКИ UI
+   ========================================================= */
+
+// Скрытие FAB-кнопки чата при открытых модалках (управление z-index)
+const observer = new MutationObserver(() => {
+  const anyModalOpen = document.querySelector('.modal-backdrop.open');
+  const chatFab = $('#chatFab');
+  if (chatFab) {
+    if (anyModalOpen) {
+      chatFab.style.opacity = '0';
+      chatFab.style.pointerEvents = 'none';
+    } else {
+      chatFab.style.opacity = '1';
+      chatFab.style.pointerEvents = 'auto';
+    }
+  }
+});
+observer.observe(document.body, { childList: true, subtree: true });
+
+// Плавная прокрутка для всех якорных ссылок
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function (e) {
+    const targetId = this.getAttribute('href');
+    if (targetId === '#') return;
+    const target = document.querySelector(targetId);
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+
+// Глобальная функция очистки для разработчика (вызывать в консоли: clearAllData())
+window.clearAllData = function() {
+  if (confirm('⚠️ ВНИМАНИЕ: Это удалит ВСЕ данные (пользователей, вакансии, чаты, анкету) из localStorage. Страница будет перезагружена.\n\nПродолжить?')) {
+    localStorage.clear();
+    location.reload();
+  }
+};
+
+console.log('%c🏥 МедОриентир v1.0 загружен успешно!', 'color: #0284c7; font-size: 14px; font-weight: bold;');
+console.log('%cДоступные команды в консоли: clearAllData()', 'color: #64748b; font-size: 12px;');
+
+/* =========================================================
+   14. КАБИНЕТ РАБОТОДАТЕЛЯ
+   ========================================================= */
+function renderEmployer(){
+  const u = STATE.currentUser;
+  if (!u || u.role !== 'employer') return;
+  $('#empTitle').textContent = u.name;
+
+  const vacs = ls.get(LS_KEYS.vacancies, []).filter(v => v.employerId === u.id);
+  $('#empTabVacs').innerHTML = vacs.length
+    ? vacs.map(v => {
+        const t = VAC_TYPE_LABELS[v.type];
+        const appsCount = ls.get(LS_KEYS.applications, []).filter(a => a.vacancyId === v.id).length;
+        return `<div class="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-white">
+          <div>
+            <div class="font-semibold text-sm">${escapeHtml(v.title)}</div>
+            <div class="text-xs text-slate-500">${t.icon} ${t.label} · ${escapeHtml(v.specialty)} · 👥 ${appsCount} откликов</div>
+          </div>
+          <button onclick="deleteVacancy('${v.id}')" class="text-xs text-rose-600 hover:underline">Удалить</button>
+        </div>`;
+      }).join('')
+    : '<div class="text-center text-slate-500 py-8 text-sm">У тебя пока нет вакансий. Добавь первую!</div>';
+
+  const apps = ls.get(LS_KEYS.applications, []).filter(a => a.employerId === u.id);
+  const users = ls.get(LS_KEYS.users, []);
+  $('#empTabApps').innerHTML = apps.length
+    ? apps.map(a => {
+        const s = users.find(x => x.id === a.studentId);
+        return `<div class="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-white">
+          <div>
+            <div class="font-semibold text-sm">${escapeHtml(s?.name || 'Студент')}</div>
+            <div class="text-xs text-slate-500">на «${escapeHtml(a.title)}» · ${fmtDate(a.date)}</div>
+          </div>
+          <button onclick="openChatWith('${a.studentId}')" class="btn-ghost !py-1.5 !px-3 text-xs">💬 Чат</button>
+        </div>`;
+      }).join('')
+    : '<div class="text-center text-slate-500 py-8 text-sm">Пока нет откликов</div>';
+}
+
+function addVacancy(e){
+  e.preventDefault();
+  const u = STATE.currentUser;
+  if (!u || u.role !== 'employer') return;
+  const v = {
+    id: 'v_'+uid(),
+    title: $('#vacTitle').value,
+    desc: $('#vacDesc').value,
+    type: $('#vacType').value,
+    specialty: $('#vacSpec').value,
+    org: u.org || u.name,
+    employerId: u.id,
+    lat: 46.3478 + (Math.random()-0.5)*0.02,
+    lng: 48.0573 + (Math.random()-0.5)*0.02,
+    createdAt: Date.now(),
+  };
+  const all = ls.get(LS_KEYS.vacancies, []);
+  all.push(v);
+  ls.set(LS_KEYS.vacancies, all);
+  showToast('Вакансия опубликована 🎉');
+  e.target.reset();
+  renderVacancies();
+  renderEmployer();
+  renderMap();
+}
+
+function deleteVacancy(id){
+  if (!confirm('Удалить вакансию?')) return;
+  const all = ls.get(LS_KEYS.vacancies, []).filter(v => v.id !== id);
+  ls.set(LS_KEYS.vacancies, all);
+  renderVacancies(); renderEmployer(); renderMap();
+  showToast('Вакансия удалена');
+}
+
+// Табы работодателя
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.emp-tab');
+  if (!tab) return;
+  $$('.emp-tab').forEach(t => { t.classList.remove('border-brand-500','text-brand-600'); t.classList.add('border-transparent','text-slate-500'); });
+  tab.classList.add('border-brand-500','text-brand-600'); tab.classList.remove('border-transparent','text-slate-500');
+  $('#empTabVacs').classList.toggle('hidden', tab.dataset.tab !== 'vacs');
+  $('#empTabApps').classList.toggle('hidden', tab.dataset.tab !== 'apps');
+  $('#empTabAdd').classList.toggle('hidden', tab.dataset.tab !== 'add');
+});
+
+/* =========================================================
+   15. АДМИН-ПАНЕЛЬ
+   ========================================================= */
+function renderDashboard(){
+  const users = ls.get(LS_KEYS.users, []);
+  const vacs = ls.get(LS_KEYS.vacancies, []);
+  const apps = ls.get(LS_KEYS.applications, []);
+  $('#kpiStudents').textContent = users.filter(u => u.role === 'student').length;
+  $('#kpiEmployers').textContent = users.filter(u => u.role === 'employer').length;
+  $('#kpiVacancies').textContent = vacs.length;
+  $('#kpiApps').textContent = apps.length;
+
+  // Распределение по специальностям (из вакансий как прокси)
+  const specs = ['Кардиология','Хирургия','Терапия','Неврология','Педиатрия','Анестезиология'];
+  const counts = specs.map(s => vacs.filter(v => v.specialty === s).length);
+  const max = Math.max(...counts, 1);
+  $('#specChart').innerHTML = specs.map((s,i) => `
+    <div>
+      <div class="flex justify-between text-xs mb-1"><span class="font-semibold">${s}</span><span class="text-slate-500">${counts[i]}</span></div>
+      <div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full grad-brand" style="width:${(counts[i]/max*100)||0}%"></div></div>
+    </div>
+  `).join('');
+
+  // Таблица
+  $('#usersTable').innerHTML = users.slice(0,20).map(u => `
+    <tr class="border-t border-slate-100">
+      <td class="px-4 py-2 font-medium">${escapeHtml(u.name)}</td>
+      <td class="px-4 py-2 text-slate-600">${escapeHtml(u.email)}</td>
+      <td class="px-4 py-2"><span class="badge badge-brand">${u.role}</span></td>
+      <td class="px-4 py-2 text-slate-500 text-xs">${new Date(u.createdAt).toLocaleDateString('ru-RU')}</td>
+    </tr>
+  `).join('');
+}
+
+function addEvent(e){
+  e.preventDefault();
+  const u = STATE.currentUser;
+  if (!u) return;
+  const ev = {
+    id: 'e_'+uid(),
+    title: $('#evTitle').value,
+    desc: $('#evDesc').value,
+    date: $('#evDate').value,
+    org: $('#evOrg').value,
+    authorId: u.id,
+  };
+  const all = ls.get(LS_KEYS.events, []);
+  all.push(ev);
+  ls.set(LS_KEYS.events, all);
+  showToast('Мероприятие добавлено 📅');
+  e.target.reset();
+  renderEvents();
+}
+
+/* =========================================================
+   16. РЕЙТИНГ / ОТЗЫВЫ
+   ========================================================= */
+function renderReviews(){
+  const users = ls.get(LS_KEYS.users, []).filter(u => u.role === 'employer');
+  const reviews = ls.get(LS_KEYS.reviews, []);
+  const apps = ls.get(LS_KEYS.applications, []);
+  const me = STATE.currentUser;
+
+  $('#reviewsList').innerHTML = users.map(emp => {
+    const empReviews = reviews.filter(r => r.orgId === emp.id);
+    const avg = empReviews.length ? (empReviews.reduce((s,r)=>s+r.rating,0)/empReviews.length).toFixed(1) : '—';
+    const canReview = me && me.role === 'student' && apps.some(a => a.employerId === emp.id && a.studentId === me.id);
+    const myReview = empReviews.find(r => r.studentId === me?.id);
+
+    return `
+      <div class="p-4 rounded-2xl border border-slate-100 bg-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-bold">${escapeHtml(emp.name)}</div>
+            <div class="text-xs text-slate-500">${empReviews.length} отзывов</div>
+          </div>
+          <div class="text-right">
+            <div class="text-2xl font-extrabold grad-text">${avg}</div>
+            <div class="text-xs text-amber-500">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5-Math.round(avg||0))}</div>
+          </div>
+        </div>
+        ${empReviews.slice(0,3).map(r => `
+          <div class="mt-3 pt-3 border-t border-slate-100 text-sm">
+            <div class="flex items-center gap-2">
+              <span class="text-amber-500">${'★'.repeat(r.rating)}</span>
+              <span class="text-xs text-slate-500">${fmtDate(r.date)}</span>
+            </div>
+            <div class="text-slate-700 mt-1">${escapeHtml(r.text)}</div>
+          </div>
+        `).join('')}
+        ${canReview && !myReview ? `
+          <form onsubmit="submitReview(event,'${emp.id}')" class="mt-3 pt-3 border-t border-slate-100">
+            <div class="stars-row gap-1 mb-2" data-rating="0">
+              ${[5,4,3,2,1].map(n => `<span class="star text-2xl" data-val="${n}">★</span>`).join('')}
+            </div>
+            <input type="hidden" name="rating" value="0" required/>
+            <textarea name="text" required rows="2" placeholder="Твой отзыв..." class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"></textarea>
+            <button class="btn-primary !py-1.5 !px-3 text-sm mt-2">Оставить отзыв</button>
+          </form>
+        ` : ''}
+      </div>
+    `;
+  }).join('') || '<div class="text-center text-slate-500 py-8">Пока нет работодателей</div>';
+
+  // Звёзды hover/click
+  $$('#reviewsList .stars-row').forEach(row => {
+    const input = row.parentElement.querySelector('input[name=rating]');
+    row.addEventListener('click', (e) => {
+      const star = e.target.closest('.star');
+      if (!star) return;
+      const val = +star.dataset.val;
+      input.value = val;
+      row.dataset.rating = val;
+      $$('.star', row).forEach(s => s.classList.toggle('active', +s.dataset.val <= val));
+    });
+  });
+}
+
+function submitReview(e, orgId){
+  e.preventDefault();
+  const u = STATE.currentUser;
+  if (!u) return;
+  const form = e.target;
+  const rating = +form.rating.value;
+  const text = form.text.value;
+  if (!rating) { showToast('Поставь оценку', 'error'); return; }
+  const all = ls.get(LS_KEYS.reviews, []);
+  all.push({ id: uid(), studentId: u.id, orgId, rating, text, date: Date.now() });
+  ls.set(LS_KEYS.reviews, all);
+  showToast('Спасибо за отзыв! ⭐');
+  renderReviews();
+}
+
+/* =========================================================
+   17. МЕРОПРИЯТИЯ
+   ========================================================= */
+function renderEvents(){
+  const events = ls.get(LS_KEYS.events, []).sort((a,b) => new Date(a.date) - new Date(b.date));
+  const me = STATE.currentUser;
+  const regs = me ? ls.get(LS_KEYS.eventRegs, []).filter(r => r.studentId === me.id) : [];
+
+  $('#eventsList').innerHTML = events.map(ev => {
+    const registered = regs.some(r => r.eventId === ev.id);
+    return `
+      <div class="p-4 rounded-2xl border border-slate-100 bg-white flex items-start gap-4">
+        <div class="w-14 h-14 rounded-xl grad-brand text-white flex flex-col items-center justify-center flex-shrink-0">
+          <div class="text-[10px] uppercase">${new Date(ev.date).toLocaleDateString('ru-RU',{month:'short'})}</div>
+          <div class="text-lg font-extrabold leading-none">${new Date(ev.date).getDate()}</div>
+        </div>
+        <div class="flex-1">
+          <div class="font-bold">${escapeHtml(ev.title)}</div>
+          <div class="text-xs text-slate-500 mt-0.5">🏢 ${escapeHtml(ev.org)} · 📅 ${ev.date}</div>
+          <p class="text-sm text-slate-600 mt-2">${escapeHtml(ev.desc)}</p>
+          ${me?.role === 'student' ? `
+            <button onclick="registerEvent('${ev.id}')" class="mt-2 text-sm font-semibold ${registered ? 'text-teal-600' : 'text-brand-600 hover:underline'}">
+              ${registered ? '✓ Ты записан' : '+ Записаться'}
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('') || '<div class="text-center text-slate-500 py-8">Пока нет мероприятий</div>';
+}
+
+function registerEvent(id){
+  const u = STATE.currentUser;
+  if (!u) return;
+  const all = ls.get(LS_KEYS.eventRegs, []);
+  if (all.some(r => r.eventId === id && r.studentId === u.id)) return;
+  all.push({ id: uid(), studentId: u.id, eventId: id, date: Date.now() });
+  ls.set(LS_KEYS.eventRegs, all);
+  const ev = ls.get(LS_KEYS.events, []).find(e => e.id === id);
+  addNotification(u.id, `📅 Ты записался на «${ev?.title}»`);
+  showToast('Запись подтверждена!');
+  renderEvents();
+  renderProfile();
+}
+
+/* =========================================================
+   18. УВЕДОМЛЕНИЯ (рендер списка)
+   ========================================================= */
+function renderNotifications(){
+  const u = STATE.currentUser;
+  if (!u) { $('#notifList').innerHTML = '<div class="text-center text-slate-500 py-8">Войди в систему</div>'; return; }
+  const all = ls.get(LS_KEYS.notifications, []).filter(n => n.userId === u.id).reverse();
+  $('#notifList').innerHTML = all.length
+    ? all.map(n => `
+        <div class="p-3 rounded-xl border ${n.read ? 'border-slate-100 bg-white' : 'border-brand-200 bg-sky-50'}">
+          <div class="text-sm">${escapeHtml(n.text)}</div>
+          <div class="text-[11px] text-slate-500 mt-1">${fmtDate(n.date)}</div>
+        </div>
+      `).join('')
+    : '<div class="text-center text-slate-500 py-8">Уведомлений пока нет</div>';
+}
+
+function markAllRead(){
+  const u = STATE.currentUser;
+  if (!u) return;
+  const all = ls.get(LS_KEYS.notifications, []);
+  all.forEach(n => { if (n.userId === u.id) n.read = true; });
+  ls.set(LS_KEYS.notifications, all);
+  renderNotifDot();
+  renderNotifications();
+  showToast('Все уведомления прочитаны');
+}
+
+/* =========================================================
+   19. КАРТА LEAFLET
+   ========================================================= */
+let mapInstance = null;
+function renderMap(){
+  if (typeof L === 'undefined') return;
+  if (!mapInstance) {
+    mapInstance = L.map('map').setView([46.3478, 48.0573], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(mapInstance);
+  }
+  // Удаляем старые маркеры
+  if (mapInstance._moMarkers) mapInstance._moMarkers.forEach(m => mapInstance.removeLayer(m));
+  mapInstance._moMarkers = [];
+
+  const vacs = ls.get(LS_KEYS.vacancies, []);
+  const grouped = {};
+  vacs.forEach(v => {
+    if (!v.lat || !v.lng) return;
+    const key = `${v.lat.toFixed(3)}_${v.lng.toFixed(3)}`;
+    if (!grouped[key]) grouped[key] = { org: v.org, lat: v.lat, lng: v.lng, items: [] };
+    grouped[key].items.push(v);
+  });
+
+  Object.values(grouped).forEach(g => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="background:linear-gradient(135deg,#0284c7,#14b8a6);color:#fff;width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(2,132,199,.5);border:3px solid #fff;"><span style="transform:rotate(45deg);font-size:16px;">🏥</span></div>`,
+      iconSize: [36, 36], iconAnchor: [18, 36],
+    });
+    const marker = L.marker([g.lat, g.lng], { icon }).addTo(mapInstance);
+    const popup = `
+      <div style="font-family:Inter,sans-serif;min-width:220px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:6px;">${escapeHtml(g.org)}</div>
+        ${g.items.map(v => `
+          <div style="padding:6px 0;border-top:1px solid #e2e8f0;font-size:12px;">
+            <div style="font-weight:600;">${escapeHtml(v.title)}</div>
+            <div style="color:#64748b;">${escapeHtml(v.specialty)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    marker.bindPopup(popup);
+    mapInstance._moMarkers.push(marker);
+  });
+}
+
+/* =========================================================
+   20. ОБРАБОТЧИКИ ФИЛЬТРОВ ВАКАНСИЙ
+   ========================================================= */
+document.addEventListener('click', (e) => {
+  const f = e.target.closest('.vac-filter');
+  if (!f) return;
+  $$('.vac-filter').forEach(b => b.classList.remove('active'));
+  f.classList.add('active');
+  vacFilter = f.dataset.filter;
+  renderVacancies();
+});
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'specFilter') {
+    specFilterVal = e.target.value;
+    renderVacancies();
+  }
+});
+
+/* =========================================================
+   21. ОБНОВЛЕНИЕ ОТКРЫТИЯ МОДАЛОК (рендер при открытии)
+   ========================================================= */
+const _origOpenModal = openModal;
+openModal = function(id, param){
+  _origOpenModal(id, param);
+  if (id === 'profileModal') renderProfile();
+  if (id === 'portfolioModal') loadPortfolio();
+  if (id === 'employerModal') renderEmployer();
+  if (id === 'dashboardModal') renderDashboard();
+  if (id === 'reviewsModal') renderReviews();
+  if (id === 'eventsModal') renderEvents();
+  if (id === 'notifModal') renderNotifications();
+};
+
+/* =========================================================
+   22. ИНИЦИАЛИЗАЦИЯ КАТАЛОГА И КАРТЫ
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+  renderVacancies();
+  setTimeout(renderMap, 200); // Даём время на рендер DOM
+});
+/* =========================================================
+   23. ИИ-АНКЕТА: ДАННЫЕ И КОНФИГУРАЦИЯ
+   ========================================================= */
+const SPECIALTIES = ['Кардиология','Хирургия','Терапия','Неврология','Педиатрия','Анестезиология'];
+const SPEC_EMOJI = {
+  'Кардиология':'🫀','Хирургия':'🔪','Терапия':'🩺',
+  'Неврология':'🧠','Педиатрия':'👶','Анестезиология':'💤'
+};
+
+// Блок 1: Психологический профиль (шкала 1-5)
+const QUIZ_BLOCK1 = [
+  { id:'q1_1', text:'Мне нравится работать руками (шить, манипуляции, процедуры)' },
+  { id:'q1_2', text:'Я люблю анализировать данные, читать исследования, разбираться в деталях' },
+  { id:'q1_3', text:'Мне важно долго общаться с пациентами и их семьями' },
+  { id:'q1_4', text:'Я спокойно реагирую на критические ситуации и кровь' },
+];
+
+// Блок 2: Академические предпочтения
+const QUIZ_BLOCK2_SPECS = ['Кардиология','Хирургия','Терапия','Неврология','Педиатрия','Анестезиология','Онкология','Офтальмология','Травматология','Психиатрия'];
+const QUIZ_BLOCK2_SKILLS = ['УЗИ-диагностика','ЭКГ-интерпретация','Хирургический шов','Реанимация','Эндоскопия','Психотерапия','Лабораторная диагностика','Функциональная диагностика'];
+
+// Блок 3: Практический опыт
+const QUIZ_BLOCK3 = [
+  { id:'q3_1', text:'Участвовал(а) в работе СНК / научном кружке', type:'boolIntensity' },
+  { id:'q3_2', text:'Проходил(а) волонтёрскую практику в клинике', type:'boolIntensity' },
+  { id:'q3_3', text:'Дежурил(а) в приёмном отделении / скорой', type:'boolIntensity' },
+];
+
+// Блок 4: Ценности (ранжирование)
+const QUIZ_BLOCK4_VALUES = [
+  { id:'val_income',  text:'💰 Высокий доход', specBonus:{'Хирургия':15,'Анестезиология':12,'Кардиология':8} },
+  { id:'val_balance', text:'⚖️ Баланс работы и жизни', specBonus:{'Терапия':12,'Педиатрия':10,'Неврология':8} },
+  { id:'val_science', text:'🔬 Наука и исследования', specBonus:{'Неврология':14,'Кардиология':12,'Онкология':10} },
+  { id:'val_prestige',text:'🏆 Престиж и признание', specBonus:{'Хирургия':14,'Кардиология':10,'Анестезиология':8} },
+  { id:'val_help',    text:'❤️ Помощь людям каждый день', specBonus:{'Терапия':14,'Педиатрия':14,'Анестезиология':10} },
+  { id:'val_dynamic', text:'⚡ Динамика и адреналин', specBonus:{'Анестезиология':15,'Хирургия':13,'Неврология':6} },
+];
+
+// Блок 5: Условия труда
+const QUIZ_BLOCK5 = [
+  { id:'q5_1', text:'Готовность к переезду в другой город', options:['Не готов','Рассмотрю','Готов в любой момент'], scores:[0,5,10] },
+  { id:'q5_2', text:'Предпочтительный режим работы', options:['Строгий график','Сменный график','Готов к дежурствам'], scores:[0,5,10] },
+  { id:'q5_3', text:'Допустимый уровень стресса', options:['Низкий','Средний','Высокий'], scores:[0,5,10] },
+];
+
+/* =========================================================
+   24. РЕНДЕР ШАГОВ АНКЕТЫ
+   ========================================================= */
+function renderQuizStep(){
+  const step = STATE.quizStep;
+  const u = STATE.currentUser;
+
+  // Загрузить сохранённые ответы
+  if (u) STATE.quizAnswers = ls.get(LS_KEYS.quizAnswers(u.id), {});
+
+  // Обновить точки-шаги
+  $$('.quiz-step-dot').forEach(dot => {
+    const s = +dot.dataset.step;
+    dot.classList.remove('active','done');
+    if (s < step) dot.classList.add('done');
+    else if (s === step) dot.classList.add('active');
+  });
+  $('#quizProgressText').textContent = `Шаг ${step} из 5`;
+  $('#quizPrev').style.visibility = step === 1 ? 'hidden' : 'visible';
+  $('#quizNext').textContent = step === 5 ? '✨ Получить результаты' : 'Далее →';
+
+  const titles = {
+    1: 'Психологический профиль',
+    2: 'Академические предпочтения',
+    3: 'Практический опыт',
+    4: 'Профессиональные ценности',
+    5: 'Условия труда',
+  };
+  $('#quizTitle').textContent = titles[step];
+
+  const body = $('#quizBody');
+  if (step === 1) body.innerHTML = renderQuizStep1();
+  if (step === 2) body.innerHTML = renderQuizStep2();
+  if (step === 3) body.innerHTML = renderQuizStep3();
+  if (step === 4) body.innerHTML = renderQuizStep4();
+  if (step === 5) body.innerHTML = renderQuizStep5();
+
+  // Восстановить значения
+  restoreQuizValues();
+}
+
+function restoreQuizValues(){
+  const a = STATE.quizAnswers;
+  const step = STATE.quizStep;
+
+  if (step === 1) {
+    QUIZ_BLOCK1.forEach(q => {
+      if (a[q.id] !== undefined) {
+        $$(`[data-qid="${q.id}"]`).forEach(btn => {
+          btn.classList.toggle('active', +btn.dataset.val === a[q.id]);
+        });
+      }
+    });
+  }
+  if (step === 2) {
+    (a.specs || []).forEach(s => {
+      const chip = document.querySelector(`[data-spec="${s}"]`);
+      if (chip) chip.classList.add('active');
+    });
+    (a.skills || []).forEach(s => {
+      const chip = document.querySelector(`[data-skill="${s}"]`);
+      if (chip) chip.classList.add('active');
+    });
+  }
+  if (step === 3) {
+    QUIZ_BLOCK3.forEach(q => {
+      if (a[q.id] !== undefined) {
+        const yesBtn = document.querySelector(`[data-qid="${q.id}"][data-val="yes"]`);
+        const noBtn = document.querySelector(`[data-qid="${q.id}"][data-val="no"]`);
+        if (yesBtn && noBtn) {
+          yesBtn.classList.toggle('active', a[q.id] === true);
+          noBtn.classList.toggle('active', a[q.id] === false);
+        }
+        if (a[q.id] === true && a[q.id+'_int'] !== undefined) {
+          $$(`[data-qid="${q.id}_int"]`).forEach(btn => {
+            btn.classList.toggle('active', +btn.dataset.val === a[q.id+'_int']);
+          });
+        }
+      }
+    });
+  }
+  if (step === 4) {
+    const order = a.valuesOrder || QUIZ_BLOCK4_VALUES.map(v => v.id);
+    const container = $('#rankList');
+    if (container) {
+      container.innerHTML = '';
+      order.forEach((id, idx) => {
+        const v = QUIZ_BLOCK4_VALUES.find(x => x.id === id);
+        if (!v) return;
+        container.appendChild(createRankItem(v, idx+1));
+      });
+      initDragAndDrop();
+    }
+  }
+  if (step === 5) {
+    QUIZ_BLOCK5.forEach(q => {
+      if (a[q.id] !== undefined) {
+        $$(`[data-qid="${q.id}"]`).forEach(btn => {
+          btn.classList.toggle('active', +btn.dataset.val === a[q.id]);
+        });
+      }
+    });
+  }
+}
+
+/* ---------- Шаг 1: Психологический профиль ---------- */
+function renderQuizStep1(){
+  return `
+    <div class="space-y-5">
+      <p class="text-sm text-slate-600">Оцени каждое утверждение от 1 (совсем не про меня) до 5 (полностью про меня).</p>
+      ${QUIZ_BLOCK1.map(q => `
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-100">
+          <div class="text-sm font-medium text-slate-800 mb-3">${q.text}</div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[11px] text-slate-500 w-16 text-center">Совсем<br/>нет</span>
+            <div class="flex gap-2 flex-1 justify-center">
+              ${[1,2,3,4,5].map(n => `
+                <button type="button" class="scale-btn" data-qid="${q.id}" data-val="${n}" onclick="setQuizScale('${q.id}', ${n})">${n}</button>
+              `).join('')}
+            </div>
+            <span class="text-[11px] text-slate-500 w-16 text-center">Полностью<br/>да</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function setQuizScale(qid, val){
+  STATE.quizAnswers[qid] = val;
+  $$(`[data-qid="${qid}"]`).forEach(btn => {
+    btn.classList.toggle('active', +btn.dataset.val === val);
+  });
+}
+
+/* ---------- Шаг 2: Академические предпочтения ---------- */
+function renderQuizStep2(){
+  return `
+    <div class="space-y-5">
+      <div>
+        <div class="text-sm font-semibold text-slate-700 mb-1">Какие специальности тебе интересны?</div>
+        <div class="text-xs text-slate-500 mb-3">Можно выбрать до 3 направлений</div>
+        <div class="flex flex-wrap gap-2" id="specsChips">
+          ${QUIZ_BLOCK2_SPECS.map(s => `
+            <span class="chip" data-spec="${s}" onclick="toggleSpec('${s}')">${SPEC_EMOJI[s] || '🏥'} ${s}</span>
+          `).join('')}
+        </div>
+      </div>
+      <div>
+        <div class="text-sm font-semibold text-slate-700 mb-1">Какие навыки хочешь развить?</div>
+        <div class="text-xs text-slate-500 mb-3">Можно выбрать до 2 навыков</div>
+        <div class="flex flex-wrap gap-2" id="skillsChips">
+          ${QUIZ_BLOCK2_SKILLS.map(s => `
+            <span class="chip" data-skill="${s}" onclick="toggleSkill('${s}')">🛠 ${s}</span>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function toggleSpec(s){
+  STATE.quizAnswers.specs = STATE.quizAnswers.specs || [];
+  const arr = STATE.quizAnswers.specs;
+  const idx = arr.indexOf(s);
+  if (idx >= 0) arr.splice(idx, 1);
+  else {
+    if (arr.length >= 3) { showToast('Можно выбрать не более 3 специальностей', 'info'); return; }
+    arr.push(s);
+  }
+  document.querySelector(`[data-spec="${s}"]`).classList.toggle('active', arr.includes(s));
+}
+
+function toggleSkill(s){
+  STATE.quizAnswers.skills = STATE.quizAnswers.skills || [];
+  const arr = STATE.quizAnswers.skills;
+  const idx = arr.indexOf(s);
+  if (idx >= 0) arr.splice(idx, 1);
+  else {
+    if (arr.length >= 2) { showToast('Можно выбрать не более 2 навыков', 'info'); return; }
+    arr.push(s);
+  }
+  document.querySelector(`[data-skill="${s}"]`).classList.toggle('active', arr.includes(s));
+}
+
+/* ---------- Шаг 3: Практический опыт ---------- */
+function renderQuizStep3(){
+  return `
+    <div class="space-y-4">
+      <p class="text-sm text-slate-600">Отметь, был ли у тебя соответствующий опыт. Если да — оцени его интенсивность.</p>
+      ${QUIZ_BLOCK3.map(q => `
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-100">
+          <div class="text-sm font-medium text-slate-800 mb-3">${q.text}</div>
+          <div class="flex gap-2 mb-3">
+            <button type="button" class="scale-btn !w-auto !px-5" data-qid="${q.id}" data-val="yes" onclick="setQuizBool('${q.id}', true)">Да, было</button>
+            <button type="button" class="scale-btn !w-auto !px-5" data-qid="${q.id}" data-val="no" onclick="setQuizBool('${q.id}', false)">Нет</button>
+          </div>
+          <div class="intensity-row hidden" data-int-for="${q.id}">
+            <div class="text-xs text-slate-600 mb-2">Интенсивность:</div>
+            <div class="flex gap-2">
+              ${[1,2,3].map(n => `
+                <button type="button" class="scale-btn !w-auto !px-4 text-xs" data-qid="${q.id}_int" data-val="${n}" onclick="setQuizIntensity('${q.id}', ${n})">
+                  ${['Разово','Периодически','Регулярно'][n-1]}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function setQuizBool(qid, val){
+  STATE.quizAnswers[qid] = val;
+  $$(`[data-qid="${qid}"]`).forEach(btn => {
+    btn.classList.toggle('active', (btn.dataset.val === 'yes') === val);
+  });
+  const row = document.querySelector(`[data-int-for="${qid}"]`);
+  if (row) row.classList.toggle('hidden', !val);
+}
+
+function setQuizIntensity(qid, val){
+  STATE.quizAnswers[qid+'_int'] = val;
+  $$(`[data-qid="${qid}_int"]`).forEach(btn => {
+    btn.classList.toggle('active', +btn.dataset.val === val);
+  });
+}
+
+/* ---------- Шаг 4: Ранжирование ценностей ---------- */
+function renderQuizStep4(){
+  const order = STATE.quizAnswers.valuesOrder || QUIZ_BLOCK4_VALUES.map(v => v.id);
+  return `
+    <div>
+      <p class="text-sm text-slate-600 mb-4">Расставь ценности по важности: перетаскивай строки мышкой (или нажми ↑↓). То, что выше — для тебя важнее.</p>
+      <div id="rankList" class="space-y-2"></div>
+      <div class="mt-4 text-xs text-slate-500 bg-amber-50 border border-amber-100 rounded-lg p-3">
+        💡 Совет: порядок влияет на рекомендации. Подумай, что для тебя действительно важно в профессии.
+      </div>
+    </div>
+  `;
+}
+
+function createRankItem(v, rank){
+  const div = document.createElement('div');
+  div.className = 'rank-item';
+  div.draggable = true;
+  div.dataset.id = v.id;
+  div.innerHTML = `
+    <div class="w-8 h-8 rounded-lg grad-brand text-white flex items-center justify-center font-bold text-sm">${rank}</div>
+    <div class="flex-1 font-medium text-sm">${v.text}</div>
+    <div class="flex flex-col gap-1">
+      <button type="button" class="w-7 h-7 rounded-md hover:bg-slate-100 text-slate-500 text-xs" onclick="moveRank('${v.id}', -1)">▲</button>
+      <button type="button" class="w-7 h-7 rounded-md hover:bg-slate-100 text-slate-500 text-xs" onclick="moveRank('${v.id}', 1)">▼</button>
+    </div>
+  `;
+  return div;
+}
+
+function initDragAndDrop(){
+  const list = $('#rankList');
+  if (!list) return;
+  let dragEl = null;
+  list.querySelectorAll('.rank-item').forEach(item => {
+    item.addEventListener('dragstart', () => { dragEl = item; item.classList.add('dragging'); });
+    item.addEventListener('dragend', () => { item.classList.remove('dragging'); dragEl = null; saveRankOrder(); });
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!dragEl || dragEl === item) return;
+      const rect = item.getBoundingClientRect();
+      const next = (e.clientY - rect.top) > rect.height / 2;
+      list.insertBefore(dragEl, next ? item.nextSibling : item);
+    });
+  });
+}
+
+function moveRank(id, dir){
+  const list = $('#rankList');
+  const items = Array.from(list.children);
+  const idx = items.findIndex(el => el.dataset.id === id);
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= items.length) return;
+  if (dir === -1) list.insertBefore(items[idx], items[newIdx]);
+  else list.insertBefore(items[idx], items[newIdx].nextSibling);
+  // Обновить цифры
+  Array.from(list.children).forEach((el, i) => {
+    el.querySelector('div').textContent = i + 1;
+  });
+  saveRankOrder();
+}
+
+function saveRankOrder(){
+  const list = $('#rankList');
+  if (!list) return;
+  STATE.quizAnswers.valuesOrder = Array.from(list.children).map(el => el.dataset.id);
+}
+
+/* ---------- Шаг 5: Условия труда ---------- */
+function renderQuizStep5(){
+  return `
+    <div class="space-y-5">
+      <p class="text-sm text-slate-600">Последний блок — про условия, в которых тебе было бы комфортно работать.</p>
+      ${QUIZ_BLOCK5.map(q => `
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-100">
+          <div class="text-sm font-medium text-slate-800 mb-3">${q.text}</div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            ${q.options.map((opt, i) => `
+              <button type="button" class="scale-btn !w-auto !py-2.5 !px-3 text-xs" data-qid="${q.id}" data-val="${i}" onclick="setQuizOption('${q.id}', ${i})">${opt}</button>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function setQuizOption(qid, val){
+  STATE.quizAnswers[qid] = val;
+  $$(`[data-qid="${qid}"]`).forEach(btn => {
+    btn.classList.toggle('active', +btn.dataset.val === val);
+  });
+}
+
+/* =========================================================
+   25. НАВИГАЦИЯ ПО АНКЕТЕ
+   ========================================================= */
+function quizPrevStep(){
+  if (STATE.quizStep > 1) {
+    saveCurrentStepAnswers();
+    STATE.quizStep--;
+    renderQuizStep();
+  }
+}
+
+function quizNextStep(){
+  if (!validateCurrentStep()) return;
+  saveCurrentStepAnswers();
+
+  if (STATE.quizStep < 5) {
+    STATE.quizStep++;
+    renderQuizStep();
+  } else {
+    // Финал — расчёт рекомендаций
+    finishQuiz();
+  }
+}
+
+function saveCurrentStepAnswers(){
+  const u = STATE.currentUser;
+  if (!u) return;
+  ls.set(LS_KEYS.quizAnswers(u.id), STATE.quizAnswers);
+}
+
+function validateCurrentStep(){
+  const step = STATE.quizStep;
+  const a = STATE.quizAnswers;
+
+  if (step === 1) {
+    const missing = QUIZ_BLOCK1.filter(q => a[q.id] === undefined);
+    if (missing.length) { showToast(`Ответь на ${missing.length} вопрос(ов) в блоке 1`, 'error'); return false; }
+  }
+  if (step === 2) {
+    if (!a.specs || a.specs.length === 0) { showToast('Выбери хотя бы 1 специальность', 'error'); return false; }
+  }
+  if (step === 3) {
+    const missing = QUIZ_BLOCK3.filter(q => a[q.id] === undefined);
+    if (missing.length) { showToast('Ответь на все вопросы блока 3', 'error'); return false; }
+  }
+  if (step === 4) {
+    if (!a.valuesOrder || a.valuesOrder.length !== QUIZ_BLOCK4_VALUES.length) {
+      showToast('Расставь все ценности в порядке важности', 'error'); return false;
+    }
+  }
+  if (step === 5) {
+    const missing = QUIZ_BLOCK5.filter(q => a[q.id] === undefined);
+    if (missing.length) { showToast('Ответь на все вопросы блока 5', 'error'); return false; }
+  }
+  return true;
+}
+
+/* =========================================================
+   26. АЛГОРИТМ РЕКОМЕНДАЦИЙ (упрощённый ИИ)
+   ========================================================= */
+function calculateRecommendations(){
+  const a = STATE.quizAnswers;
+  const scores = {};
+  SPECIALTIES.forEach(s => scores[s] = 0);
+
+  // --- Блок 1: психологический профиль ---
+  // q1_1 работа руками → хирургия, анестезиология
+  scores['Хирургия']        += (a.q1_1 || 0) * 6;
+  scores['Анестезиология']  += (a.q1_1 || 0) * 4;
+  scores['Травматология']   = (scores['Травматология'] || 0) + (a.q1_1 || 0) * 3;
+
+  // q1_2 анализ данных → неврология, кардиология
+  scores['Неврология'] += (a.q1_2 || 0) * 6;
+  scores['Кардиология'] += (a.q1_2 || 0) * 5;
+
+  // q1_3 общение → терапия, педиатрия
+  scores['Терапия']   += (a.q1_3 || 0) * 6;
+  scores['Педиатрия'] += (a.q1_3 || 0) * 6;
+
+  // q1_4 стрессоустойчивость → анестезиология, хирургия
+  scores['Анестезиология'] += (a.q1_4 || 0) * 5;
+  scores['Хирургия']       += (a.q1_4 || 0) * 4;
+
+  // --- Блок 2: академические предпочтения (+25 за каждую выбранную специальность) ---
+  (a.specs || []).forEach(s => {
+    if (scores[s] !== undefined) scores[s] += 25;
+  });
+  // Навыки косвенно указывают на специальности
+  const skillMap = {
+    'УЗИ-диагностика': ['Кардиология','Терапия'],
+    'ЭКГ-интерпретация': ['Кардиология','Терапия'],
+    'Хирургический шов': ['Хирургия','Травматология'],
+    'Реанимация': ['Анестезиология','Хирургия'],
+    'Эндоскопия': ['Хирургия','Терапия'],
+    'Психотерапия': ['Неврология','Педиатрия'],
+    'Лабораторная диагностика': ['Неврология','Кардиология'],
+    'Функциональная диагностика': ['Кардиология','Неврология'],
+  };
+  (a.skills || []).forEach(sk => {
+    (skillMap[sk] || []).forEach(s => { if (scores[s] !== undefined) scores[s] += 8; });
+  });
+
+  // --- Блок 3: практический опыт ---
+  QUIZ_BLOCK3.forEach(q => {
+    if (a[q.id] === true) {
+      const intensity = a[q.id+'_int'] || 1;
+      const bonus = intensity * 5;
+      if (q.id === 'q3_1') { // СНК → наука
+        scores['Неврология'] += bonus;
+        scores['Кардиология'] += bonus;
+      }
+      if (q.id === 'q3_2') { // волонтёрство → общение
+        scores['Терапия'] += bonus;
+        scores['Педиатрия'] += bonus;
+      }
+      if (q.id === 'q3_3') { // дежурства → стресс
+        scores['Анестезиология'] += bonus;
+        scores['Хирургия'] += bonus;
+      }
+    }
+  });
+
+  // --- Блок 4: ценности (ранжирование — чем выше, тем больше бонус) ---
+  const order = a.valuesOrder || [];
+  order.forEach((id, idx) => {
+    const v = QUIZ_BLOCK4_VALUES.find(x => x.id === id);
+    if (!v) return;
+    const weight = (QUIZ_BLOCK4_VALUES.length - idx); // 6,5,4,3,2,1
+    Object.entries(v.specBonus).forEach(([spec, base]) => {
+      if (scores[spec] !== undefined) scores[spec] += base * weight / 3;
+    });
+  });
+
+  // --- Блок 5: условия труда ---
+  // Готовность к дежурствам (q5_2 = 2) → анестезиология, хирургия
+  if (a.q5_2 === 2) { scores['Анестезиология'] += 10; scores['Хирургия'] += 8; }
+  if (a.q5_2 === 0) { scores['Терапия'] += 6; scores['Педиатрия'] += 6; scores['Неврология'] += 4; }
+  // Высокий стресс (q5_3 = 2) → анестезиология, хирургия
+  if (a.q5_3 === 2) { scores['Анестезиология'] += 12; scores['Хирургия'] += 10; }
+  if (a.q5_3 === 0) { scores['Анестезиология'] -= 15; scores['Хирургия'] -= 10; } // красный флаг
+
+  // --- Коллаборативная фильтрация ---
+  const me = STATE.currentUser;
+  if (me) {
+    const users = ls.get(LS_KEYS.users, []).filter(u => u.role === 'student' && u.id !== me.id);
+    const myVector = buildUserVector(a);
+    const similarities = [];
+    users.forEach(u => {
+      const otherAns = ls.get(LS_KEYS.quizAnswers(u.id));
+      if (!otherAns || !otherAns.recommendations) return;
+      const otherVector = buildUserVector(otherAns);
+      const dist = euclideanDistance(myVector, otherVector);
+      if (dist < 8) { // достаточно похожи
+        similarities.push({ user: u, ans: otherAns, dist });
+      }
+    });
+    // Добавить бонус от похожих студентов
+    similarities.slice(0, 5).forEach(sim => {
+      const topSpec = sim.ans.recommendations?.[0]?.name;
+      if (topSpec && scores[topSpec] !== undefined) scores[topSpec] += 6;
+    });
+  }
+
+  // --- Анализ спроса на рынке (бонус от количества вакансий) ---
+  const vacs = ls.get(LS_KEYS.vacancies, []);
+  const vacCounts = {};
+  SPECIALTIES.forEach(s => vacCounts[s] = vacs.filter(v => v.specialty === s).length);
+  const maxVac = Math.max(...Object.values(vacCounts), 1);
+  SPECIALTIES.forEach(s => {
+    scores[s] += (vacCounts[s] / maxVac) * 10; // до 10 бонусных баллов
+  });
+
+  // Нормализация в проценты
+  const maxScore = Math.max(...Object.values(scores), 1);
+  const results = SPECIALTIES.map(name => ({
+    name,
+    score: Math.round((scores[name] / maxScore) * 100),
+    emoji: SPEC_EMOJI[name] || '🏥',
+  })).sort((a,b) => b.score - a.score);
+
+  // Обоснования
+  results.forEach(r => {
+    r.reason = generateReason(r.name, a);
+    r.redFlags = generateRedFlags(r.name, a);
+  });
+
+  return results;
+}
+
+function buildUserVector(a){
+  return [
+    a.q1_1 || 0, a.q1_2 || 0, a.q1_3 || 0, a.q1_4 || 0,
+    a.q5_2 || 0, a.q5_3 || 0,
+    (a.specs || []).length,
+  ];
+}
+
+function euclideanDistance(a, b){
+  if (a.length !== b.length) return 999;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += (a[i] - b[i]) ** 2;
+  return Math.sqrt(sum);
+}
+
+function generateReason(spec, a){
+  const reasons = [];
+  if (spec === 'Кардиология') {
+    if ((a.q1_2 || 0) >= 4) reasons.push('ты любишь анализировать данные');
+    if ((a.specs || []).includes('Кардиология')) reasons.push('ты указал кардиологию как интересную');
+    if (!reasons.length) reasons.push('сочетание аналитики и практики');
+  }
+  if (spec === 'Хирургия') {
+    if ((a.q1_1 || 0) >= 4) reasons.push('ты любишь работать руками');
+    if ((a.q1_4 || 0) >= 4) reasons.push('у тебя высокая стрессоустойчивость');
+    if (!reasons.length) reasons.push('динамичная практическая специальность');
+  }
+  if (spec === 'Терапия') {
+    if ((a.q1_3 || 0) >= 4) reasons.push('ты ценишь общение с пациентами');
+    if (!reasons.length) reasons.push('широкий профиль и контакт с людьми');
+  }
+  if (spec === 'Неврология') {
+    if ((a.q1_2 || 0) >= 4) reasons.push('у тебя аналитический склад ума');
+    if (!reasons.length) reasons.push('сочетание науки и диагностики');
+  }
+  if (spec === 'Педиатрия') {
+    if ((a.q1_3 || 0) >= 4) reasons.push('ты любишь общаться с пациентами');
+    if (!reasons.length) reasons.push('работа с детьми и длительный контакт');
+  }
+  if (spec === 'Анестезиология') {
+    if ((a.q1_4 || 0) >= 4) reasons.push('ты спокоен в критических ситуациях');
+    if (!reasons.length) reasons.push('высокая динамика и ответственность');
+  }
+  return reasons.slice(0, 2).join('; ') + '.';
+}
+
+function generateRedFlags(spec, a){
+  const flags = [];
+  if (spec === 'Хирургия' && (a.q1_4 || 0) <= 2) flags.push('низкая стрессоустойчивость');
+  if (spec === 'Хирургия' && (a.q1_1 || 0) <= 2) flags.push('не указана склонность к ручной работе');
+  if (spec === 'Анестезиология' && (a.q5_3 || 0) === 0) flags.push('ты указал неготовность к высокому стрессу');
+  if (spec === 'Анестезиология' && (a.q1_4 || 0) <= 2) flags.push('низкая стрессоустойчивость');
+  if (spec === 'Терапия' && (a.q1_3 || 0) <= 2) flags.push('не указана склонность к общению');
+  if (spec === 'Педиатрия' && (a.q1_3 || 0) <= 2) flags.push('не указана склонность к общению');
+  if (spec === 'Неврология' && (a.q1_2 || 0) <= 2) flags.push('низкий интерес к анализу данных');
+  if (spec === 'Кардиология' && (a.q1_2 || 0) <= 2) flags.push('низкий интерес к аналитике');
+  return flags;
+}
+
+/* =========================================================
+   27. ЗАВЕРШЕНИЕ АНКЕТЫ И РЕНДЕР РЕЗУЛЬТАТОВ
+   ========================================================= */
+function finishQuiz(){
+  const recs = calculateRecommendations();
+  const u = STATE.currentUser;
+  if (u) {
+    STATE.quizAnswers.recommendations = recs;
+    STATE.quizAnswers.completedAt = Date.now();
+    ls.set(LS_KEYS.quizAnswers(u.id), STATE.quizAnswers);
+    addNotification(u.id, `🎉 ИИ-анкета завершена! Твоя топ-специальность: ${recs[0].emoji} ${recs[0].name}`);
+  }
+
+  renderResults(recs);
+  closeModal('quizModal');
+  openModal('resultsModal');
+}
+
+function renderResults(recs){
+  const body = $('#resultsBody');
+  body.innerHTML = `
+    <div class="p-4 rounded-2xl grad-soft border border-slate-100 mb-4">
+      <div class="text-sm text-slate-600">На основе твоих ответов мы проанализировали профиль, предпочтения, опыт и рынок труда. Вот что получилось:</div>
+    </div>
+    ${recs.slice(0, 5).map((r, i) => `
+      <div class="p-4 rounded-2xl border ${i === 0 ? 'border-brand-300 bg-sky-50' : 'border-slate-100 bg-white'} card-hover">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="text-3xl">${r.emoji}</div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-lg">${r.name}</span>
+                ${i === 0 ? '<span class="badge badge-brand">🏆 Топ-выбор</span>' : ''}
+              </div>
+              <div class="text-xs text-slate-500 mt-0.5">${r.reason}</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-2xl font-extrabold grad-text">${r.score}%</div>
+            <div class="text-[10px] text-slate-500 uppercase">совпадение</div>
+          </div>
+        </div>
+        ${r.redFlags.length ? `
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-start gap-2 text-xs">
+            <span class="text-rose-500">⚠️</span>
+            <div class="text-rose-700"><b>Обрати внимание:</b> ${r.redFlags.join(', ')}</div>
+          </div>
+        ` : ''}
+      </div>
+    `).join('')}
+    <div class="mt-4 p-4 rounded-2xl bg-amber-50 border border-amber-100 text-sm text-amber-900">
+      <b>💡 Что дальше?</b> Нажми «Перейти к стажировкам» — мы покажем предложения по твоей топ-специальности <b>${recs[0].emoji} ${recs[0].name}</b>.
+    </div>
+  `;
+
+  // Сохранить топ-1 для фильтра каталога
+  if (recs[0]) {
+    STATE.topSpecialty = recs[0].name;
+    specFilterVal = recs[0].name;
+    const sel = $('#specFilter');
+    if (sel) sel.value = recs[0].name;
+  }
+}
+
+/* =========================================================
+   28. ОБНОВЛЁННАЯ ФУНКЦИЯ scrollToVacancies
+   ========================================================= */
+scrollToVacancies = function(){
+  renderVacancies();
+  const el = document.getElementById('vacancies');
+  if (el) el.scrollIntoView({behavior:'smooth'});
+};
+
+/* =========================================================
+   29. ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ АНКЕТЫ ПРИ ОТКРЫТИИ
+   ========================================================= */
+const _origOpenModal2 = openModal;
+openModal = function(id, param){
+  _origOpenModal2(id, param);
+  if (id === 'quizModal') {
+    STATE.quizStep = 1;
+    STATE.quizAnswers = {};
+    renderQuizStep();
+  }
+};
+/* =========================================================
+   30. СИСТЕМА ЧАТА (СТУДЕНТ ↔ РАБОТОДАТЕЛЬ)
+   ========================================================= */
+let currentChatPartnerId = null;
+
+function openChatWith(partnerId) {
+  currentChatPartnerId = partnerId;
+  const users = ls.get(LS_KEYS.users, []);
+  const partner = users.find(u => u.id === partnerId);
+  if (partner) {
+    $('#chatPartner').textContent = partner.name;
+  }
+  renderChatMessages();
+  openModal('chatModal');
+}
+
+function openChat() {
+  const u = STATE.currentUser;
+  if (!u) { openModal('authModal', 'login'); return; }
+
+  // Если партнёр не выбран, пытаемся найти последнего, с кем был диалог
+  if (!currentChatPartnerId) {
+    if (u.role === 'student') {
+      const apps = ls.get(LS_KEYS.applications, []).filter(a => a.studentId === u.id);
+      if (apps.length > 0) {
+        openChatWith(apps[apps.length - 1].employerId);
+        return;
+      }
+    } else if (u.role === 'employer') {
+      const apps = ls.get(LS_KEYS.applications, []).filter(a => a.employerId === u.id);
+      if (apps.length > 0) {
+        openChatWith(apps[apps.length - 1].studentId);
+        return;
+      }
+    }
+    // Fallback: первый попавшийся работодатель/студент для демо
+    const users = ls.get(LS_KEYS.users, []);
+    const fallback = users.find(x => x.role === (u.role === 'student' ? 'employer' : 'student'));
+    if (fallback) openChatWith(fallback.id);
+    else showToast('Нет доступных собеседников', 'info');
+  } else {
+    openModal('chatModal');
+  }
+}
+
+function getChatKey() {
+  if (!STATE.currentUser || !currentChatPartnerId) return null;
+  return LS_KEYS.chat(STATE.currentUser.id, currentChatPartnerId);
+}
+
+function renderChatMessages() {
+  const key = getChatKey();
+  if (!key) return;
+  const messages = ls.get(key, []);
+  const container = $('#chatMessages');
+  
+  if (messages.length === 0) {
+    container.innerHTML = `
+      <div class="text-center text-slate-400 py-8 text-sm">
+        <div class="text-3xl mb-2">💬</div>
+        Начните диалог. Сообщения сохраняются локально.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = messages.map(msg => {
+    const isMe = msg.senderId === STATE.currentUser.id;
+    return `
+      <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
+        <div class="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm shadow-sm ${isMe ? 'grad-brand text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md border border-slate-200'}">
+          <div class="whitespace-pre-wrap">${escapeHtml(msg.text)}</div>
+          <div class="text-[10px] ${isMe ? 'text-white/70' : 'text-slate-500'} mt-1 text-right">${fmtDate(msg.date)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Прокрутка вниз
+  setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+}
+
+function sendChatMessage(e) {
+  e.preventDefault();
+  const input = $('#chatInput');
+  const text = input.value.trim();
+  if (!text || !currentChatPartnerId) return;
+
+  const key = getChatKey();
+  const messages = ls.get(key, []);
+  
+  // Добавляем наше сообщение
+  messages.push({
+    id: uid(),
+    senderId: STATE.currentUser.id,
+    text: text,
+    date: Date.now()
+  });
+  ls.set(key, messages);
+  input.value = '';
+  renderChatMessages();
+
+  // Логика авто-ответа работодателя (если мы студент и пишем работодателю)
+  const users = ls.get(LS_KEYS.users, []);
+  const partner = users.find(u => u.id === currentChatPartnerId);
+  
+  if (STATE.currentUser.role === 'student' && partner?.role === 'employer') {
+    // Имитация набора текста (1.5 - 2.5 секунды)
+    setTimeout(() => {
+      const replies = [
+        "Здравствуйте! Спасибо за сообщение, мы обязательно рассмотрим ваше портфолио в ближайшее время.",
+        "Добрый день! Подскажите, когда вам было бы удобно подойти на ознакомительную встречу в клинику?",
+        "Спасибо за отклик! Мы как раз ищем мотивированного студента. Расскажите немного о вашем практическом опыте.",
+        "Принято! Наш отдел кадров свяжется с вами для уточнения деталей и графика стажировки.",
+        "Отличные навыки! Мы готовы пригласить вас на собеседование на следующей неделе."
+      ];
+      const randomReply = replies[Math.floor(Math.random() * replies.length)];
+      
+      messages.push({
+        id: uid(),
+        senderId: currentChatPartnerId,
+        text: randomReply,
+        date: Date.now()
+      });
+      ls.set(key, messages);
+      
+      // Если модалка чата всё ещё открыта, обновляем её
+      if ($('#chatModal').classList.contains('open')) {
+        renderChatMessages();
+      }
+      
+      // Уведомление студенту (если вдруг он закрыл чат)
+      addNotification(STATE.currentUser.id, `💬 Новое сообщение от ${partner.name}`);
+    }, 1500 + Math.random() * 1000);
+  }
+}
+
+/* =========================================================
+   31. УЛУЧШЕНИЯ UX И ПОЛИРОВКИ
+   ========================================================= */
+
+// Глобальный перехватчик открытия модалок для динамического рендера
+const _finalOpenModal = openModal;
+openModal = function(id, param) {
+  _finalOpenModal(id, param);
+  
+  // Динамический рендер содержимого при открытии
+  if (id === 'profileModal') renderProfile();
+  if (id === 'portfolioModal') loadPortfolio();
+  if (id === 'employerModal') renderEmployer();
+  if (id === 'dashboardModal') renderDashboard();
+  if (id === 'reviewsModal') renderReviews();
+  if (id === 'eventsModal') renderEvents();
+  if (id === 'notifModal') {
+    renderNotifications();
+    // Сбрасываем бейдж при открытии
+    markAllRead(); 
+  }
+  if (id === 'quizModal') {
+    STATE.quizStep = 1;
+    STATE.quizAnswers = {};
+    renderQuizStep();
+  }
+};
+
+// Улучшенный рендер шапки при изменении состояния
+function refreshUI() {
+  renderHeaderAuth();
+  renderVacancies();
+  renderNotifDot();
+  // Обновляем карту, если она инициализирована
+  if (typeof mapInstance !== 'undefined' && mapInstance) {
+    setTimeout(renderMap, 100);
+  }
+}
+
+// Обработчик изменения размера окна для корректного ресайза карты
+window.addEventListener('resize', () => {
+  if (typeof mapInstance !== 'undefined' && mapInstance) {
+    mapInstance.invalidateSize();
+  }
+});
+
+// Хелпер для сброса данных (для тестирования, доступен в консоли)
+window.resetMedOrientir = function() {
+  if (confirm('Это удалит ВСЕ данные из localStorage и перезагрузит страницу. Продолжить?')) {
+    localStorage.clear();
+    location.reload();
+  }
+};
+
+/* =========================================================
+   32. ФИНАЛЬНАЯ ИНИЦИАЛИЗАЦИЯ
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+  seedDefaults();
+  
+  // Восстановление сессии
+  const sess = ls.get(LS_KEYS.session);
+  if (sess) {
+    const users = ls.get(LS_KEYS.users, []);
+    const u = users.find(x => x.id === sess.id);
+    if (u) {
+      STATE.currentUser = u;
+    }
+  }
+  
+  refreshUI();
+  initScrollAnimations();
+  
+  // Инициализация карты с небольшой задержкой для корректного рендера Leaflet
+  setTimeout(() => {
+    renderMap();
+  }, 300);
+
+  // Клик по колокольчику
+  const notifBtn = $('#notifBtn');
+  if (notifBtn) {
+    notifBtn.addEventListener('click', () => openModal('notifModal'));
+  }
+});
+/* =========================================================
+   12. ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+  seedDefaults();
+  // Восстановить сессию
+  const sess = ls.get(LS_KEYS.session);
+  if (sess) {
+    const users = ls.get(LS_KEYS.users, []);
+    const u = users.find(x => x.id === sess.id);
+    if (u) { STATE.currentUser = u; }
+  }
+  renderHeaderAuth();
+  initScrollAnimations();
+
+  // Клик по колокольчику
+  $('#notifBtn').addEventListener('click', () => openModal('notifModal'));
+});
+</script>
+
+</body>
+</html>
